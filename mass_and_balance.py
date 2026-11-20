@@ -1,35 +1,37 @@
 #!/usr/bin/env python3
 """
-Mass & balance calculator for OK-HAD (Cessna 152) and OK-KUN (Cessna 172P).
+Mass & balance and performance for OK-HAD (Cessna 152) and OK-KUN (Cessna 172P).
 
 Units follow the Cessna POH: pounds (lb), inches (in), moments in lb-in/1000.
 You can also type weights in kg ("80kg") and fuel in litres ("60l").
 Flight times can be decimal hours ("1.5") or hours:minutes ("1:30").
 
+After the loading sheet it works out the take-off and landing distances from
+the POH tables (performance.py) and checks them against the runways in
+aerodromes.py.
+
 BEFORE USING THIS FOR A REAL FLIGHT:
   1. Copy each aircraft's basic empty weight and moment from its CURRENT
      weighing report into AIRCRAFT below (left as None on purpose, so the
      program refuses to run with made-up numbers).
-  2. Check the arms, limits, fuel capacity and fuel flow against that
+  2. Copy the aerodrome elevations and runway declared distances from the AIP
+     into aerodromes.py (until then the runway checks are skipped).
+  3. Check the arms, limits, fuel capacity and fuel flow against that
      aircraft's own POH / flight manual and your school's procedures.
 """
+
+import performance as perf
+from aerodromes import AERODROMES, ALTERNATES, DEPARTURE, missing_data
 
 LB_PER_KG = 2.20462
 LITRES_PER_GAL = 3.78541
 FUEL_LB_PER_GAL = 6.0     # AVGAS, as used in the POH
 FINAL_RESERVE_MIN = 30    # VFR day final reserve; use 45 at night
 
-DEPARTURE = "LPPM"        # Portimao - every flight starts here
-# Alternates: (ICAO, name, straight-line distance from LPPM in nm).
-# The flight time is worked out from each aircraft's cruise_kt.
-ALTERNATES = [
-    ("LPFR", "Faro", 31),
-    ("LPEV", "Evora", 89),
-]
-
 AIRCRAFT = {
     "OK-HAD": {
         "type": "Cessna 152",
+        "perf": "C152",           # performance tables in performance.py
         # From OK-HAD's weighing report. If the report gives an arm instead
         # of a moment: moment = weight x arm / 1000.
         "empty_weight": None,     # lb
@@ -57,6 +59,7 @@ AIRCRAFT = {
     },
     "OK-KUN": {
         "type": "Cessna 172P",
+        "perf": "C172P",
         "empty_weight": None,     # lb
         "empty_moment": None,     # lb-in/1000
         "stations": [
@@ -68,16 +71,16 @@ AIRCRAFT = {
         ],
         "max_baggage": 120,
         "fuel_arm": 48.0,
-        "usable_fuel_gal": 40.0,  # standard tanks
+        "usable_fuel_gal": 40.0,  # standard tanks (long range 50, integral 62)
         "fuel_flow_gph": 9.0,     # planning figure, 9 gal/h = 54 lb/h
         "cruise_kt": 100,
-        "taxi_fuel_lb": 7,
+        "taxi_fuel_lb": 7,        # POH: 1.1 gal for start, taxi and take-off
         "max_ramp": 2407,
         "max_takeoff": 2400,
         "max_landing": 2400,
         # Normal category: forward limit 35.0 in at 1950 lb or less, straight
-        # line to 38.5 in at 2400 lb; aft limit 47.3 in at all weights.
-        "cg_forward": [(1950, 35.0), (2400, 38.5)],
+        # line to 39.5 in at 2400 lb; aft limit 47.3 in at all weights.
+        "cg_forward": [(1950, 35.0), (2400, 39.5)],
         "cg_aft": 47.3,
     },
 }
@@ -89,8 +92,8 @@ def to_number(text):
     return float(text.replace(",", "."))   # accept 1,5 as well as 1.5
 
 
-def ask(prompt, convert, example):
-    """Ask until convert(text) returns a number that isn't negative."""
+def ask(prompt, convert, example, minimum=0):
+    """Ask until convert(text) gives a value (not below minimum, if set)."""
     while True:
         text = input(prompt).strip().lower().replace(" ", "")
         try:
@@ -98,15 +101,17 @@ def ask(prompt, convert, example):
         except ValueError:
             print(f"  Didn't understand that - try something like {example}")
             continue
-        if value < 0:
+        if minimum is not None and value < minimum:
             print("  Can't be negative.")
             continue
         return value
 
 
-def menu(count):
+def menu(count, default=None):
     """Converter for ask(): a menu number from 1 to count."""
     def convert(text):
+        if text == "" and default:
+            return default
         n = int(text)
         if not 1 <= n <= count:
             raise ValueError
@@ -144,6 +149,55 @@ def hhmm(h):
     return f"{minutes // 60}:{minutes % 60:02d}"
 
 
+def qnh_hpa(text):
+    qnh = to_number(text)
+    if not 900 <= qnh <= 1100:
+        raise ValueError
+    return qnh
+
+
+def celsius(text):
+    oat = to_number(text.removesuffix("c"))
+    if not -60 <= oat <= 60:
+        raise ValueError
+    return oat
+
+
+def wind(text):
+    """'270/10' or '27010' -> (270, 10); Enter or 'calm' -> (0, 0)."""
+    text = text.removesuffix("kt")
+    if text in ("", "calm", "0"):
+        return 0, 0
+    if "/" in text:
+        direction, speed = text.split("/")
+    elif len(text) == 5 and text.isdigit():
+        direction, speed = text[:3], text[3:]
+    else:
+        raise ValueError
+    direction, speed = int(direction), int(speed)
+    if not (0 <= direction <= 360 and 0 <= speed <= 60):
+        raise ValueError
+    return direction, speed
+
+
+def ask_weather(icao, previous):
+    """(QNH, OAT, wind direction, wind speed) at icao. If `previous` is given
+    as (icao, weather), Enter on the QNH reuses that weather."""
+    if previous:
+        print(f"Weather at {icao} (Enter on QNH = same as {previous[0]})")
+        qnh = ask("  QNH (hPa) - ",
+                  lambda t: "same" if t == "" else qnh_hpa(t), "1015", None)
+        if qnh == "same":
+            return previous[1]
+    else:
+        print(f"Weather at {icao}")
+        qnh = ask("  QNH (hPa) - ", qnh_hpa, "1015")
+    oat = ask("  OAT (C) - ", celsius, "18 or -2", minimum=None)
+    direction, speed = ask("  Wind (e.g. 270/10, Enter = calm) - ",
+                           wind, "270/10", minimum=None)
+    return qnh, oat, direction, speed
+
+
 # ------------------------------------------------------------ calculation --
 
 def forward_limit(ac, weight):
@@ -151,6 +205,90 @@ def forward_limit(ac, weight):
     if weight <= w1:
         return cg1
     return cg1 + (cg2 - cg1) * (weight - w1) / (w2 - w1)
+
+
+def runway_check(ac, kind, icao, mass, weather):
+    """Print take-off or landing distances for every runway at icao.
+    Returns a list of problems (empty if at least one runway is fine)."""
+    ad = AERODROMES[icao]
+    qnh, oat, wind_dir, wind_kt = weather
+    pa = perf.pressure_altitude(ad["elevation_ft"], qnh)
+    data = perf.TYPES[ac["perf"]]
+    takeoff = kind == "take-off"
+    lookup = perf.takeoff if takeoff else perf.landing
+    (roll, total), speeds = lookup(ac["perf"], mass, pa, oat)
+
+    wind_txt = f"{wind_dir:03d}/{wind_kt:02d}" if wind_kt else "calm"
+    print(f"\n{kind.upper()} {icao} - {mass:.0f} lb, elevation "
+          f"{ad['elevation_ft']} ft, QNH {qnh:g}, PA {pa:.0f} ft, "
+          f"OAT {oat:g} C, wind {wind_txt}")
+    if roll is None:
+        print("  Outside the POH table (pressure altitude or temperature too "
+              "high) - no figures.")
+        return [f"{kind} {icao}: outside the POH performance table"]
+
+    if takeoff:
+        factor, grass_pct = perf.TAKEOFF_FACTOR, 0.15
+        print(f"  Short field, {data['takeoff_note']}: lift off {speeds[0]} "
+              f"KIAS, {speeds[1]} KIAS at 50 ft")
+        print(f"  POH (zero wind, paved): ground roll {roll:.0f} ft, "
+              f"to 50 ft {total:.0f} ft")
+        print(f"  {'RWY':5}{'Wind kt':>10}{'Run m':>8}{'TORA':>7}"
+              f"{'To 50ft m':>11}{'TODA':>7}")
+    else:
+        factor, grass_pct = perf.LANDING_FACTOR, 0.45
+        print(f"  Short field, {data['landing_note']}: {speeds[0]} KIAS "
+              "at 50 ft")
+        print(f"  POH (zero wind, paved): ground roll {roll:.0f} ft, "
+              f"from 50 ft {total:.0f} ft")
+        print(f"  {'RWY':5}{'Wind kt':>10}{'From 50ft m':>13}{'LDA':>7}")
+
+    usable = []
+    for rwy in ad["runways"]:
+        bearing = rwy.get("bearing")
+        if bearing is None:
+            bearing = int(rwy["rwy"][:2]) * 10
+        head, cross = perf.wind_components(bearing, wind_dir, wind_kt)
+        run, dist = perf.corrected((roll, total), head, rwy["surface"] == "grass",
+                                   grass_pct)
+        run, dist = (x * factor * perf.M_PER_FT for x in (run, dist))
+
+        status = []
+        if -head > perf.MAX_TAILWIND_KT:
+            status.append(f"tailwind over {perf.MAX_TAILWIND_KT} kt")
+        if cross > data["max_crosswind_kt"]:
+            status.append(f"crosswind over the {data['max_crosswind_kt']} kt "
+                          "demonstrated")
+        if takeoff and run > rwy["tora"]:
+            status.append("TORA too short")
+        if takeoff and dist > rwy["toda"]:
+            status.append("TODA too short")
+        if not takeoff and dist > rwy["lda"]:
+            status.append("LDA too short")
+        if not status:
+            usable.append(rwy["rwy"])
+
+        wind_col = f"{'H' if head >= 0 else 'T'}{abs(head):.0f} X{cross:.0f}"
+        verdict = ", ".join(status) or "OK"
+        if takeoff:
+            print(f"  {rwy['rwy']:5}{wind_col:>10}{run:8.0f}{rwy['tora']:7}"
+                  f"{dist:11.0f}{rwy['toda']:7}  {verdict}")
+        else:
+            print(f"  {rwy['rwy']:5}{wind_col:>10}{dist:13.0f}{rwy['lda']:7}  "
+                  f"{verdict}")
+
+    grass = any(r["surface"] == "grass" for r in ad["runways"])
+    print(f"  (wind{', grass' if grass else ''} corrections and the "
+          f"x{factor:g} safety factor included; H = head, T = tail, X = cross)")
+
+    if takeoff:
+        climb = perf.climb(ac["perf"], pa, oat)
+        if climb:
+            print(f"  Max rate of climb: {climb[1]:.0f} ft/min at {climb[0]} "
+                  "KIAS (POH, max weight, flaps up)")
+    if not usable:
+        return [f"{kind} {icao}: no runway within limits"]
+    return []
 
 
 def main():
@@ -174,21 +312,34 @@ def main():
     full = ac["usable_fuel_gal"]
     fuel = ask(f"Usable fuel on board, US gal or add l (Enter = full {full:g} gal) - ",
                lambda t: fuel_gal(t, full), "20 or 75l")
-    trip_h = ask("Flight time (h) - ", hours, "1.5 or 1:30")
+
+    places = list(AERODROMES)
+    print("Destination")
+    for i, icao in enumerate(places, 1):
+        note = "back to base" if icao == DEPARTURE else AERODROMES[icao]["name"]
+        print(f"{i}-{icao}  {note}")
+    print(f"{len(places) + 1}-Other")
+    n = ask(f"Destination (Enter = {DEPARTURE}) - ",
+            menu(len(places) + 1, default=places.index(DEPARTURE) + 1), "1")
+    dest = places[n - 1] if n <= len(places) else None
+    trip_h = ask(f"Flight time to {dest or 'destination'} (h) - ", hours,
+                 "1.5 or 1:30")
 
     kt = ac["cruise_kt"]
     print(f"Choose an alternate (distance from {DEPARTURE}, time at {kt} kt)")
-    for i, (icao, name, nm) in enumerate(ALTERNATES, 1):
-        print(f"{i}-{icao}  {name:6}{nm:4} nm  {hhmm(nm / kt)}")
+    for i, icao in enumerate(ALTERNATES, 1):
+        ad = AERODROMES[icao]
+        nm = ad["nm_from_departure"]
+        print(f"{i}-{icao}  {ad['name']:6}{nm:4} nm  {hhmm(nm / kt)}")
     other = len(ALTERNATES) + 1
     print(f"{other}-Other (type the flight time)")
     n = ask("Alternate - ", menu(other), "1")
     if n == other:
-        alt = "alternate"
+        alt_icao, alt = None, "alternate"
         alt_h = ask("Flight time to alternate (h) - ", hours, "0:20")
     else:
-        alt, _, nm = ALTERNATES[n - 1]
-        alt_h = nm / kt
+        alt_icao = alt = ALTERNATES[n - 1]
+        alt_h = AERODROMES[alt]["nm_from_departure"] / kt
 
     gph = ac["fuel_flow_gph"]
     fuel_arm = ac["fuel_arm"]
@@ -228,7 +379,7 @@ def main():
     add(f"Fuel to {alt} {hhmm(alt_h)}", -alt_lb, fuel_arm)
     subtotal(f"Mass at {alt} (ALT)", "ALT", ac["max_landing"])
 
-    print(f"\n{reg}  {ac['type']}  departing {DEPARTURE}")
+    print(f"\n{reg}  {ac['type']}  {DEPARTURE} - {dest or 'destination'}")
     print(f"{'':26}{'Mass lb':>9}{'Arm in':>9}{'Moment':>9}")
     for label, weight, arm, moment, is_subtotal in sheet:
         if is_subtotal:
@@ -273,6 +424,26 @@ def main():
     elif left_min < FINAL_RESERVE_MIN:
         problems.append(f"Fuel: less than the {FINAL_RESERVE_MIN} min final "
                         f"reserve left at {alt}")
+
+    # ---------------------------------------------------- performance --
+    mass = {name: w for name, w, _, _ in conditions}
+    checks = [("take-off", DEPARTURE, mass["TOM"]),
+              ("landing", dest, mass["LM"]),
+              ("landing at alternate", alt_icao, mass["ALT"])]
+    checks = [c for c in checks if c[1]]        # skip "Other" places
+    print(f"\nPERFORMANCE (POH short field; safety factor x{perf.TAKEOFF_FACTOR:g} "
+          f"take-off, x{perf.LANDING_FACTOR:g} landing)")
+    weather, previous = {}, None
+    for icao in dict.fromkeys(c[1] for c in checks):
+        missing = missing_data(icao)
+        if missing:
+            print(f"{icao}: {missing} in aerodromes.py - no runway check there.")
+            continue
+        weather[icao] = ask_weather(icao, previous)
+        previous = (icao, weather[icao])
+    for kind, icao, m in checks:
+        if icao in weather:
+            problems += runway_check(ac, kind, icao, m, weather[icao])
 
     if problems:
         print("\nNOT WITHIN LIMITS:")
