@@ -10,8 +10,10 @@ using made-up numbers.
 
 For each runway direction add one line to "runways":
     rwy      designator, e.g. "29"
-    bearing  true bearing in degrees, for the wind components
-             (None = use the designator x 10)
+    bearing  runway direction in degrees from the AIP, for the wind
+             components (None = use the designator x 10). The AIP gives it
+             magnetic; in southern Portugal that is within about 1-2 degrees
+             of true, so a METAR (true) or ATIS (magnetic) wind both work.
     tora, toda, asda, lda   declared distances in metres
     surface  "paved" or "grass"
 """
@@ -37,8 +39,19 @@ AERODROMES = {
     "LPEV": {
         "name": "Evora",
         "nm_from_departure": 89,
-        "elevation_ft": None,
-        "runways": [],
+        # AIP Portugal LPEV AD 2.24.01-1, aerodrome chart (12 AUG 2021,
+        # AIRAC 003-21): ARP 38 31 47N 007 53 31W, elevation 246 m.
+        "elevation_ft": 807,
+        "runways": [
+            # RWY 01/19: asphalt 1300 x 23 m, displaced threshold at both
+            # ends. Declared distances: AIP AD 2.13 (not on the chart).
+            {"rwy": "01", "bearing": 6, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": "paved"},
+            {"rwy": "19", "bearing": 186, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": "paved"},
+            # RWY 07/25 (sand, 530 x 30 m) is left out: the POH has no
+            # performance data for sand.
+        ],
     },
 }
 
