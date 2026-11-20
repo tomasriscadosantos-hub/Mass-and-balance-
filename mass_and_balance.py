@@ -42,12 +42,13 @@ AIRCRAFT = {
             ("Oil, 6 qt (no oil filter)", 11.25, -14.7),
             ("Unusable fuel, 1.5 gal", 9.0, 40.0),
         ],
-        # Loading stations: (name, arm in inches, max lb or None)
+        # Loading stations: (name, arm in inches, max lb or None,
+        #                    what Enter means - None = must be typed)
         "stations": [
-            ("Pilot", 39.0, None),
-            ("Front passenger", 39.0, None),
-            ("Baggage area 1", 64.0, 120),
-            ("Baggage area 2", 84.0, 40),
+            ("Student", 39.0, None, None),
+            ("Instructor", 39.0, None, "solo"),
+            ("Baggage area 1", 64.0, 120, "none"),
+            ("Baggage area 2", 84.0, 40, "none"),
         ],
         "max_baggage": 120,       # baggage areas 1 + 2 together
         "fuel_arm": 42.0,
@@ -75,12 +76,13 @@ AIRCRAFT = {
             ("Oil, 7 qt", 13.125, -14.0),
             ("Unusable fuel, 3 gal (standard tanks)", 18.0, 46.0),
         ],
+        # Always flown with two: student and instructor (rear seats empty,
+        # arm 73 in if ever needed).
         "stations": [
-            ("Pilot", 37.0, None),
-            ("Front passenger", 37.0, None),
-            ("Rear passengers", 73.0, None),
-            ("Baggage area 1", 95.0, 120),
-            ("Baggage area 2", 123.0, 50),
+            ("Student", 37.0, None, None),
+            ("Instructor", 37.0, None, None),
+            ("Baggage area 1", 95.0, 120, "none"),
+            ("Baggage area 2", 123.0, 50, "none"),
         ],
         "max_baggage": 120,
         "fuel_arm": 48.0,
@@ -145,6 +147,12 @@ def menu(count, default=None):
             raise ValueError
         return n
     return convert
+
+
+def required_weight(text):
+    if text == "":
+        raise ValueError
+    return weight_lb(text)
 
 
 def weight_lb(text):
@@ -414,10 +422,14 @@ def main():
               "at the top of this file.")
         return
 
-    print(f"\n{reg} ({ac['type']}) - weights in lb, or add kg (e.g. 80kg). "
-          "Enter = empty.")
-    loads = [(name, ask(f"{name} - ", weight_lb, "170 or 77kg"), arm, max_lb)
-             for name, arm, max_lb in ac["stations"]]
+    print(f"\n{reg} ({ac['type']}) - weights in lb, or add kg (e.g. 80kg).")
+    loads = []
+    for name, arm, max_lb, empty in ac["stations"]:
+        if empty is None:
+            lb = ask(f"{name} - ", required_weight, "170 or 77kg")
+        else:
+            lb = ask(f"{name} (Enter = {empty}) - ", weight_lb, "170 or 77kg")
+        loads.append((name, lb, arm, max_lb))
 
     full = ac["usable_fuel_gal"]
     fuel = ask(f"Usable fuel on board, US gal or add l (Enter = full {full:g} gal) - ",

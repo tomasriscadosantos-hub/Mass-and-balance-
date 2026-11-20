@@ -72,7 +72,10 @@ How the figures are worked out (all in `performance.py`):
 
 **Input formats.**
 
-- Weights: lb (`170`) or kg (`77kg`). Press Enter on a seat or baggage area to leave it empty.
+- Weights: lb (`170`) or kg (`77kg`). It asks for the student, the instructor and the two
+  baggage areas. The C172 is always flown with two people, so both seats must be filled in. In
+  the C152, press Enter on the instructor for a solo flight. Press Enter on a baggage area to
+  leave it empty.
 - Fuel: US gal (`20`) or litres (`75l`). Press Enter for full tanks.
 - Times: `1.5` or `1:30`.
 - Wind: `270/10`. Press Enter for calm.
