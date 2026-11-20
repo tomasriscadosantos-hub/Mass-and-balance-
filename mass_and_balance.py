@@ -45,7 +45,7 @@ AIRCRAFT = {
         ],
         "max_baggage": 120,       # baggage areas 1 + 2 together
         "fuel_arm": 42.0,
-        "usable_fuel_gal": 24.5,  # standard tanks (long range: 37.5)
+        "usable_fuel_gal": 24.5,  # OK-HAD: standard tanks, 24.5 gal usable
         "fuel_flow_gph": 6.0,     # planning figure, 6 gal/h = 36 lb/h
         "cruise_kt": 90,          # planning TAS, for the alternate leg
         "taxi_fuel_lb": 5,        # start, taxi and run-up
@@ -71,7 +71,7 @@ AIRCRAFT = {
         ],
         "max_baggage": 120,
         "fuel_arm": 48.0,
-        "usable_fuel_gal": 40.0,  # standard tanks (long range 50, integral 62)
+        "usable_fuel_gal": 40.0,  # OK-KUN: standard tanks, 40 gal usable
         "fuel_flow_gph": 9.0,     # planning figure, 9 gal/h = 54 lb/h
         "cruise_kt": 100,
         "taxi_fuel_lb": 7,        # POH: 1.1 gal for start, taxi and take-off
