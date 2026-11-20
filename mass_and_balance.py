@@ -32,10 +32,14 @@ AIRCRAFT = {
     "OK-HAD": {
         "type": "Cessna 152",
         "perf": "C152",           # performance tables in performance.py
-        # From OK-HAD's weighing report. If the report gives an arm instead
-        # of a moment: moment = weight x arm / 1000.
-        "empty_weight": None,     # lb
-        "empty_moment": None,     # lb-in/1000
+        # Weighing protocol F-T-016, work order 014/2023 (9 Feb - 30 Mar 2023):
+        # basic empty weight 1154.5 lb, C.G. arm 29.97 in, moment 34.58.
+        # NOTE: weighed defueled and without oil, and the protocol does not
+        # add them back; POH figure 6-1 adds oil (6 qt 11.3 lb / 7 qt with
+        # filter 13.1 lb at -14.7 in) and unusable fuel (9 lb at 40.0 in).
+        # Check with maintenance which figure is the aircraft's real BEW.
+        "empty_weight": 1154.5,   # lb
+        "empty_moment": 34.58,    # lb-in/1000
         # Loading stations: (name, arm in inches, max lb or None)
         "stations": [
             ("Pilot", 39.0, None),
@@ -61,7 +65,9 @@ AIRCRAFT = {
         "type": "Cessna 172P",
         "perf": "C172P",
         # Weighing protocol F-T-016, 16 Feb 2024: basic empty weight 1473 lb,
-        # C.G. arm 40.27 in, moment 59317 lb-in.
+        # C.G. arm 40.27 in, moment 59317 lb-in. If it was weighed without
+        # oil and fuel, POH figure 6-1 adds oil (15 lb at -14.0 in) and
+        # unusable fuel (18 lb at 46.0 in); check with maintenance.
         "empty_weight": 1473.0,   # lb
         "empty_moment": 59.317,   # lb-in/1000
         "stations": [

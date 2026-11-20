@@ -85,7 +85,12 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    weighing report into `AIRCRAFT` at the top of `mass_and_balance.py`. Until then the program
    stops for that aircraft.
    - OK-KUN: done (weighing of 16 Feb 2024: 1473 lb, arm 40.27 in, moment 59317 lb-in).
-   - OK-HAD: still to fill in.
+   - OK-HAD: done (weighing 014/2023, 30 Mar 2023: 1154.5 lb, arm 29.97 in, moment 34.58).
+
+   Both are the weights as weighed. OK-HAD's protocol says it was weighed defueled and without
+   oil. The POH (figure 6-1) adds oil and unusable fuel to get the basic empty weight. That
+   would be about +20 lb for OK-HAD and +33 lb for OK-KUN. Check with maintenance which
+   figure is right.
 
    Update them whenever the aircraft is re-weighed or its equipment changes.
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
