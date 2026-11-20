@@ -39,7 +39,7 @@ AIRCRAFT = {
         # (lb, lb-in/1000); None = not filled in yet
         "weighed": (1154.5, 34.58),
         "add_to_weighed": [       # (item, lb, arm in)
-            ("Oil, 7 qt (with oil filter; 6 qt = 11.25 lb without)", 13.125, -14.7),
+            ("Oil, 6 qt (no oil filter)", 11.25, -14.7),
             ("Unusable fuel, 1.5 gal", 9.0, 40.0),
         ],
         # Loading stations: (name, arm in inches, max lb or None)
@@ -71,7 +71,8 @@ AIRCRAFT = {
         # in POH figure 6-1.
         "weighed": (1473.0, 59.317),
         "add_to_weighed": [
-            ("Oil, 8 qt", 15.0, -14.0),
+            # kept between 5 and 7 qt; 7 qt (the heavier end) is used here
+            ("Oil, 7 qt", 13.125, -14.0),
             ("Unusable fuel, 3 gal (standard tanks)", 18.0, 46.0),
         ],
         "stations": [

@@ -88,11 +88,12 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
 
    | | As weighed | Oil | Unusable fuel | Basic empty weight |
    |---|---|---|---|---|
-   | OK-HAD (protocol 014/2023, 30 Mar 2023) | 1154.5 lb, moment 34.58 | 7 qt, 13.1 lb at −14.7 in | 1.5 gal, 9 lb at 40.0 in | **1176.6 lb, moment 34.75, arm 29.53 in** |
-   | OK-KUN (protocol of 16 Feb 2024) | 1473 lb, moment 59.32 | 8 qt, 15 lb at −14.0 in | 3 gal, 18 lb at 46.0 in | **1506.0 lb, moment 59.94, arm 39.80 in** |
+   | OK-HAD (protocol 014/2023, 30 Mar 2023) | 1154.5 lb, moment 34.58 | 6 qt, 11.25 lb at −14.7 in | 1.5 gal, 9 lb at 40.0 in | **1174.75 lb, moment 34.77, arm 29.60 in** |
+   | OK-KUN (protocol of 16 Feb 2024) | 1473 lb, moment 59.32 | 7 qt, 13.1 lb at −14.0 in | 3 gal, 18 lb at 46.0 in | **1504.1 lb, moment 59.96, arm 39.86 in** |
 
-   OK-HAD uses 7 qt of oil, the POH figure with an oil filter. Without a filter it is 6 qt
-   (11.25 lb).
+   Oil quantities:
+   - OK-HAD: 6 qt (no oil filter).
+   - OK-KUN: kept between 5 and 7 qt, so the heavier 7 qt is used.
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are
