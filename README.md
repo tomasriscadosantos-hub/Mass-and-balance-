@@ -74,7 +74,11 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
 
 1. **Empty weight and moment of each aircraft.** Copy them from that aircraft's current
    weighing report into `AIRCRAFT` at the top of `mass_and_balance.py`. Until then the program
-   stops.
+   stops for that aircraft.
+   - OK-KUN: done (weighing of 16 Feb 2024: 1473 lb, arm 40.27 in, moment 59317 lb-in).
+   - OK-HAD: still to fill in.
+
+   Update them whenever the aircraft is re-weighed or its equipment changes.
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are

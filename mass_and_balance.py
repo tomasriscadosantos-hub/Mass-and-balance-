@@ -60,8 +60,10 @@ AIRCRAFT = {
     "OK-KUN": {
         "type": "Cessna 172P",
         "perf": "C172P",
-        "empty_weight": None,     # lb
-        "empty_moment": None,     # lb-in/1000
+        # Weighing protocol F-T-016, 16 Feb 2024: basic empty weight 1473 lb,
+        # C.G. arm 40.27 in, moment 59317 lb-in.
+        "empty_weight": 1473.0,   # lb
+        "empty_moment": 59.317,   # lb-in/1000
         "stations": [
             ("Pilot", 37.0, None),
             ("Front passenger", 37.0, None),
