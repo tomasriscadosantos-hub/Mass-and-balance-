@@ -81,18 +81,18 @@ How the figures are worked out (all in `performance.py`):
 
 Some data is **left blank on purpose**, so the program never runs on made-up numbers:
 
-1. **Empty weight and moment of each aircraft.** Copy them from that aircraft's current
-   weighing report into `AIRCRAFT` at the top of `mass_and_balance.py`. Until then the program
-   stops for that aircraft.
-   - OK-KUN: done (weighing of 16 Feb 2024: 1473 lb, arm 40.27 in, moment 59317 lb-in).
-   - OK-HAD: done (weighing 014/2023, 30 Mar 2023: 1154.5 lb, arm 29.97 in, moment 34.58).
+1. **Empty weight and moment of each aircraft.** They are in `AIRCRAFT` at the top of
+   `mass_and_balance.py`. Update them whenever the aircraft is re-weighed or its equipment
+   changes. The script takes the weighing protocol figure (as weighed: defueled, without oil)
+   and adds oil and unusable fuel, as in POH figure 6-1:
 
-   Both are the weights as weighed. OK-HAD's protocol says it was weighed defueled and without
-   oil. The POH (figure 6-1) adds oil and unusable fuel to get the basic empty weight. That
-   would be about +20 lb for OK-HAD and +33 lb for OK-KUN. Check with maintenance which
-   figure is right.
+   | | As weighed | Oil | Unusable fuel | Basic empty weight |
+   |---|---|---|---|---|
+   | OK-HAD (protocol 014/2023, 30 Mar 2023) | 1154.5 lb, moment 34.58 | 7 qt, 13.1 lb at −14.7 in | 1.5 gal, 9 lb at 40.0 in | **1176.6 lb, moment 34.75, arm 29.53 in** |
+   | OK-KUN (protocol of 16 Feb 2024) | 1473 lb, moment 59.32 | 8 qt, 15 lb at −14.0 in | 3 gal, 18 lb at 46.0 in | **1506.0 lb, moment 59.94, arm 39.80 in** |
 
-   Update them whenever the aircraft is re-weighed or its equipment changes.
+   OK-HAD uses 7 qt of oil, the POH figure with an oil filter. Without a filter it is 6 qt
+   (11.25 lb).
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are

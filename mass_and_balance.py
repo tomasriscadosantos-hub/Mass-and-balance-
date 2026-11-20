@@ -11,9 +11,10 @@ the POH tables (performance.py) and checks them against the runways in
 aerodromes.py.
 
 BEFORE USING THIS FOR A REAL FLIGHT:
-  1. Copy each aircraft's basic empty weight and moment from its CURRENT
-     weighing report into AIRCRAFT below (left as None on purpose, so the
-     program refuses to run with made-up numbers).
+  1. Keep each aircraft's weighing figures in AIRCRAFT below up to date with
+     its CURRENT weighing report. The basic empty weight is worked out as in
+     POH figure 6-1: as weighed + oil + unusable fuel. (Set "weighed" to None
+     and the program refuses to run for that aircraft.)
   2. Copy the aerodrome elevations and runway declared distances from the AIP
      into aerodromes.py (until then the runway checks are skipped).
   3. Check the arms, limits, fuel capacity and fuel flow against that
@@ -32,14 +33,15 @@ AIRCRAFT = {
     "OK-HAD": {
         "type": "Cessna 152",
         "perf": "C152",           # performance tables in performance.py
-        # Weighing protocol F-T-016, work order 014/2023 (9 Feb - 30 Mar 2023):
-        # basic empty weight 1154.5 lb, C.G. arm 29.97 in, moment 34.58.
-        # NOTE: weighed defueled and without oil, and the protocol does not
-        # add them back; POH figure 6-1 adds oil (6 qt 11.3 lb / 7 qt with
-        # filter 13.1 lb at -14.7 in) and unusable fuel (9 lb at 40.0 in).
-        # Check with maintenance which figure is the aircraft's real BEW.
-        "empty_weight": 1154.5,   # lb
-        "empty_moment": 34.58,    # lb-in/1000
+        # Weighing protocol F-T-016, work order 014/2023 (30 Mar 2023):
+        # 1154.5 lb, C.G. arm 29.97 in, moment 34.58 - weighed defueled and
+        # without oil. Oil and unusable fuel are added as in POH figure 6-1.
+        # (lb, lb-in/1000); None = not filled in yet
+        "weighed": (1154.5, 34.58),
+        "add_to_weighed": [       # (item, lb, arm in)
+            ("Oil, 7 qt (with oil filter; 6 qt = 11.25 lb without)", 13.125, -14.7),
+            ("Unusable fuel, 1.5 gal", 9.0, 40.0),
+        ],
         # Loading stations: (name, arm in inches, max lb or None)
         "stations": [
             ("Pilot", 39.0, None),
@@ -64,12 +66,14 @@ AIRCRAFT = {
     "OK-KUN": {
         "type": "Cessna 172P",
         "perf": "C172P",
-        # Weighing protocol F-T-016, 16 Feb 2024: basic empty weight 1473 lb,
-        # C.G. arm 40.27 in, moment 59317 lb-in. If it was weighed without
-        # oil and fuel, POH figure 6-1 adds oil (15 lb at -14.0 in) and
-        # unusable fuel (18 lb at 46.0 in); check with maintenance.
-        "empty_weight": 1473.0,   # lb
-        "empty_moment": 59.317,   # lb-in/1000
+        # Weighing protocol F-T-016, 16 Feb 2024: 1473 lb, C.G. arm 40.27 in,
+        # moment 59317 lb-in, as weighed. Oil and unusable fuel are added as
+        # in POH figure 6-1.
+        "weighed": (1473.0, 59.317),
+        "add_to_weighed": [
+            ("Oil, 8 qt", 15.0, -14.0),
+            ("Unusable fuel, 3 gal (standard tanks)", 18.0, 46.0),
+        ],
         "stations": [
             ("Pilot", 37.0, None),
             ("Front passenger", 37.0, None),
@@ -92,6 +96,21 @@ AIRCRAFT = {
         "cg_aft": 47.3,
     },
 }
+
+
+def basic_empty(ac):
+    """Basic empty weight and moment: as weighed + oil + unusable fuel."""
+    if ac["weighed"] is None:
+        return None, None
+    weight, moment = ac["weighed"]
+    for _, lb, arm in ac["add_to_weighed"]:
+        weight += lb
+        moment += lb * arm / 1000
+    return weight, moment
+
+
+for _ac in AIRCRAFT.values():
+    _ac["empty_weight"], _ac["empty_moment"] = basic_empty(_ac)
 
 
 # ------------------------------------------------------------------ input --
