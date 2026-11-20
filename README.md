@@ -12,7 +12,7 @@ python3 mass_and_balance.py
 ```
 
 Every flight departs from **LPPM (Portimão)**. It asks for the people, baggage, fuel and flight
-time, then has you pick an alternate: LPFR (Faro, 31 nm) or LPBJ (Beja, 64 nm), or type the time
+time, then has you pick an alternate: LPFR (Faro, 31 nm) or LPEV (Évora, 89 nm), or type the time
 yourself. The alternate's flight time comes from its distance from LPPM and the aircraft's
 planning cruise speed (90 kt for the C152, 100 kt for the C172P). Then it prints a
 loading sheet (mass, arm, moment) and checks the ZFM, ramp mass, TOM, LM and mass at the

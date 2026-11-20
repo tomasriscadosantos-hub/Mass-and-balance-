@@ -24,7 +24,7 @@ DEPARTURE = "LPPM"        # Portimao - every flight starts here
 # The flight time is worked out from each aircraft's cruise_kt.
 ALTERNATES = [
     ("LPFR", "Faro", 31),
-    ("LPBJ", "Beja", 64),
+    ("LPEV", "Evora", 89),
 ]
 
 AIRCRAFT = {
