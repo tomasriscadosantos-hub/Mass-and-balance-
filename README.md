@@ -11,7 +11,10 @@ A terminal calculator for the school's two aircraft:
 python3 mass_and_balance.py
 ```
 
-It asks for the people, baggage, fuel, flight time and time to the alternate. Then it prints a
+Every flight departs from **LPPM (Portimão)**. It asks for the people, baggage, fuel and flight
+time, then has you pick an alternate: LPFR (Faro, 31 nm) or LPBJ (Beja, 64 nm), or type the time
+yourself. The alternate's flight time comes from its distance from LPPM and the aircraft's
+planning cruise speed (90 kt for the C152, 100 kt for the C172P). Then it prints a
 loading sheet (mass, arm, moment) and checks the ZFM, ramp mass, TOM, LM and mass at the
 alternate against the maximum masses and the CG envelope. It also shows how much fuel is
 left at the alternate.
@@ -25,4 +28,5 @@ area to leave it empty, or on fuel for full tanks.
 Each aircraft's **basic empty weight and moment are left blank on purpose**. Copy them
 from that aircraft's current weighing report into `AIRCRAFT` at the top of
 `mass_and_balance.py`. Also check the arms, limits, fuel capacity and planning fuel flow
-against the aircraft's own POH and the school's procedures.
+against the aircraft's own POH and the school's procedures. To add another alternate, add
+a line to `ALTERNATES` with its ICAO code, name and distance from LPPM in nm.

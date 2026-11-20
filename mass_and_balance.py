@@ -19,6 +19,14 @@ LITRES_PER_GAL = 3.78541
 FUEL_LB_PER_GAL = 6.0     # AVGAS, as used in the POH
 FINAL_RESERVE_MIN = 30    # VFR day final reserve; use 45 at night
 
+DEPARTURE = "LPPM"        # Portimao - every flight starts here
+# Alternates: (ICAO, name, straight-line distance from LPPM in nm).
+# The flight time is worked out from each aircraft's cruise_kt.
+ALTERNATES = [
+    ("LPFR", "Faro", 31),
+    ("LPBJ", "Beja", 64),
+]
+
 AIRCRAFT = {
     "OK-HAD": {
         "type": "Cessna 152",
@@ -37,6 +45,7 @@ AIRCRAFT = {
         "fuel_arm": 42.0,
         "usable_fuel_gal": 24.5,  # standard tanks (long range: 37.5)
         "fuel_flow_gph": 6.0,     # planning figure, 6 gal/h = 36 lb/h
+        "cruise_kt": 90,          # planning TAS, for the alternate leg
         "taxi_fuel_lb": 5,        # start, taxi and run-up
         "max_ramp": 1675,
         "max_takeoff": 1670,
@@ -61,6 +70,7 @@ AIRCRAFT = {
         "fuel_arm": 48.0,
         "usable_fuel_gal": 40.0,  # standard tanks
         "fuel_flow_gph": 9.0,     # planning figure, 9 gal/h = 54 lb/h
+        "cruise_kt": 100,
         "taxi_fuel_lb": 7,
         "max_ramp": 2407,
         "max_takeoff": 2400,
@@ -92,6 +102,16 @@ def ask(prompt, convert, example):
             print("  Can't be negative.")
             continue
         return value
+
+
+def menu(count):
+    """Converter for ask(): a menu number from 1 to count."""
+    def convert(text):
+        n = int(text)
+        if not 1 <= n <= count:
+            raise ValueError
+        return n
+    return convert
 
 
 def weight_lb(text):
@@ -134,17 +154,11 @@ def forward_limit(ac, weight):
 
 
 def main():
+    print(f"Departure {DEPARTURE}")
     regs = list(AIRCRAFT)
     for i, reg in enumerate(regs, 1):
         print(f"{i}-{reg}  {AIRCRAFT[reg]['type']}")
-
-    def pick(text):
-        n = int(text)
-        if not 1 <= n <= len(regs):
-            raise ValueError
-        return n
-
-    reg = regs[ask("Choose an airplane: ", pick, "1") - 1]
+    reg = regs[ask("Choose an airplane: ", menu(len(regs)), "1") - 1]
     ac = AIRCRAFT[reg]
     if ac["empty_weight"] is None or ac["empty_moment"] is None:
         print(f"\n{reg}'s basic empty weight and moment are not filled in yet.")
@@ -161,7 +175,20 @@ def main():
     fuel = ask(f"Usable fuel on board, US gal or add l (Enter = full {full:g} gal) - ",
                lambda t: fuel_gal(t, full), "20 or 75l")
     trip_h = ask("Flight time (h) - ", hours, "1.5 or 1:30")
-    alt_h = ask("Flight time to alternate (h) - ", hours, "0:20")
+
+    kt = ac["cruise_kt"]
+    print(f"Choose an alternate (distance from {DEPARTURE}, time at {kt} kt)")
+    for i, (icao, name, nm) in enumerate(ALTERNATES, 1):
+        print(f"{i}-{icao}  {name:6}{nm:4} nm  {hhmm(nm / kt)}")
+    other = len(ALTERNATES) + 1
+    print(f"{other}-Other (type the flight time)")
+    n = ask("Alternate - ", menu(other), "1")
+    if n == other:
+        alt = "alternate"
+        alt_h = ask("Flight time to alternate (h) - ", hours, "0:20")
+    else:
+        alt, _, nm = ALTERNATES[n - 1]
+        alt_h = nm / kt
 
     gph = ac["fuel_flow_gph"]
     fuel_arm = ac["fuel_arm"]
@@ -198,10 +225,10 @@ def main():
     subtotal("Take-off mass (TOM)", "TOM", ac["max_takeoff"])
     add(f"Trip fuel {hhmm(trip_h)}", -trip_lb, fuel_arm)
     subtotal("Landing mass (LM)", "LM", ac["max_landing"])
-    add(f"Alternate fuel {hhmm(alt_h)}", -alt_lb, fuel_arm)
-    subtotal("Mass at alternate (ALT)", "ALT", ac["max_landing"])
+    add(f"Fuel to {alt} {hhmm(alt_h)}", -alt_lb, fuel_arm)
+    subtotal(f"Mass at {alt} (ALT)", "ALT", ac["max_landing"])
 
-    print(f"\n{reg}  {ac['type']}")
+    print(f"\n{reg}  {ac['type']}  departing {DEPARTURE}")
     print(f"{'':26}{'Mass lb':>9}{'Arm in':>9}{'Moment':>9}")
     for label, weight, arm, moment, is_subtotal in sheet:
         if is_subtotal:
@@ -239,13 +266,13 @@ def main():
 
     left_lb = fuel_lb - taxi_lb - trip_lb - alt_lb
     left_min = left_lb / (gph * FUEL_LB_PER_GAL) * 60
-    print(f"\nFuel left at alternate: {left_lb / FUEL_LB_PER_GAL:.1f} gal "
+    print(f"\nFuel left at {alt}: {left_lb / FUEL_LB_PER_GAL:.1f} gal "
           f"({left_lb:.0f} lb, about {left_min:.0f} min at {gph:g} gal/h)")
     if left_lb < 0:
         problems.append("Fuel: not enough fuel for the trip and the alternate")
     elif left_min < FINAL_RESERVE_MIN:
         problems.append(f"Fuel: less than the {FINAL_RESERVE_MIN} min final "
-                        "reserve left at the alternate")
+                        f"reserve left at {alt}")
 
     if problems:
         print("\nNOT WITHIN LIMITS:")
