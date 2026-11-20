@@ -17,7 +17,7 @@ values (which gives a slightly longer distance, so it stays on the safe side).
 
 from math import cos, radians, sin
 
-FT_PER_HPA = 30           # pressure altitude = elevation + (1013 - QNH) x 30 ft
+FT_PER_HPA = 27           # pressure altitude = elevation + (1013 - QNH) x 27 ft
 # False: interpolate between table values (more exact).
 # True:  read the table at the next higher weight, altitude and temperature,
 #        the conservative method the POH uses in its sample problem.
@@ -25,11 +25,17 @@ NEXT_HIGHER = False
 M_PER_FT = 0.3048
 MAX_TAILWIND_KT = 10      # the POH corrections only go up to 10 kt tailwind
 
-# Safety factors put on top of the POH distances before they are compared with
-# the runway (the UK CAA Safety Sense 7 recommendation). Set to 1.0 to compare
-# the plain POH numbers.
-TAKEOFF_FACTOR = 1.33
-LANDING_FACTOR = 1.43
+# How the distances are checked against the runway (the school's performance
+# sheet, same factors as EASA performance class B):
+#   take-off: ground roll <= TORA and distance to 50 ft <= TODA, and then
+#             - with a clearway or stopway (TODA or ASDA longer than TORA):
+#               50 ft distance x1.15 <= TODA and x1.3 <= ASDA
+#             - without: 50 ft distance x1.25 <= TORA
+#   landing:  ground roll <= LDA and distance from 50 ft <= 70 % of LDA
+TODA_FACTOR = 1.15
+ASDA_FACTOR = 1.3
+TORA_FACTOR = 1.25
+LDA_FRACTION = 0.70
 
 ALTS = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
 TEMPS = [0, 10, 20, 30, 40]
@@ -202,6 +208,11 @@ def _speeds(tables, weight):
 
 def pressure_altitude(elevation_ft, qnh_hpa):
     return elevation_ft + (1013 - qnh_hpa) * FT_PER_HPA
+
+
+def density_altitude(pa, oat):
+    """PA + 120 ft for each degree C above ISA (ISA = 15 C - 2 C per 1000 ft)."""
+    return pa + 120 * (oat - (15 - 2 * pa / 1000))
 
 
 def wind_components(runway_bearing, wind_dir, wind_kt):

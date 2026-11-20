@@ -209,88 +209,170 @@ def forward_limit(ac, weight):
     return cg1 + (cg2 - cg1) * (weight - w1) / (w2 - w1)
 
 
-def runway_check(ac, kind, icao, mass, weather):
-    """Print take-off or landing distances for every runway at icao.
-    Returns a list of problems (empty if at least one runway is fine)."""
-    ad = AERODROMES[icao]
+def runway_bearing(rwy):
+    bearing = rwy.get("bearing")
+    return int(rwy["rwy"][:2]) * 10 if bearing is None else bearing
+
+
+def positive(text):
+    value = to_number(text)
+    if value <= 0:
+        raise ValueError
+    return value
+
+
+def optional_positive(text):
+    return None if text == "" else positive(text)
+
+
+def ask_site(icao, previous):
+    """Weather and runway in use at icao. Enter on the runway picks the one
+    most into wind."""
+    weather = ask_weather(icao, previous)
     qnh, oat, wind_dir, wind_kt = weather
-    pa = perf.pressure_altitude(ad["elevation_ft"], qnh)
+    runways = AERODROMES[icao]["runways"]
+    best = max(runways, key=lambda r: perf.wind_components(
+        runway_bearing(r), wind_dir, wind_kt)[0])
+
+    def pick(text):
+        if text == "":
+            return best
+        for rwy in runways:
+            if rwy["rwy"].lower() == text:
+                return rwy
+        raise ValueError
+
+    names = "/".join(r["rwy"] for r in runways)
+    rwy = ask(f"  Runway in use ({names}, Enter = {best['rwy']}) - ", pick,
+              best["rwy"], minimum=None)
+    pa = perf.pressure_altitude(AERODROMES[icao]["elevation_ft"], qnh)
+    return {"weather": weather, "rwy": rwy, "pa": pa,
+            "da": perf.density_altitude(pa, oat)}
+
+
+def ask_obstacle(climb_kias):
+    """Optional obstacle after take-off: (NM, elevation ft, altitude limit
+    ft or None, ground speed kt), or None."""
+    nm = ask("Obstacle after take-off - distance in NM (Enter = none) - ",
+             optional_positive, "1.5", minimum=None)
+    if nm is None:
+        return None
+    elevation = ask("  Obstacle elevation (ft) - ", to_number, "659")
+    limit = ask("  Altitude limit after departure (ft, Enter = none) - ",
+                optional_positive, "1000", minimum=None)
+    gs = ask(f"  Ground speed in the climb (kt, Enter = {climb_kias}, no wind) - ",
+             lambda t: float(climb_kias) if t == "" else positive(t), "60")
+    return nm, elevation, limit, gs
+
+
+def runway_report(ac, kind, icao, mass, site, note=""):
+    """Take-off or landing check on the runway in use, laid out like the
+    school's performance sheet. Returns a list of problems."""
     data = perf.TYPES[ac["perf"]]
+    rwy = site["rwy"]
+    qnh, oat, wind_dir, wind_kt = site["weather"]
     takeoff = kind == "take-off"
-    lookup = perf.takeoff if takeoff else perf.landing
-    (roll, total), speeds = lookup(ac["perf"], mass, pa, oat)
-
+    where = f"{kind} {icao} RWY {rwy['rwy']}"
+    head, cross = perf.wind_components(runway_bearing(rwy), wind_dir, wind_kt)
+    side = "head" if head >= 0 else "tail"
     wind_txt = f"{wind_dir:03d}/{wind_kt:02d}" if wind_kt else "calm"
-    print(f"\n{kind.upper()} {icao} - {mass:.0f} lb, elevation "
-          f"{ad['elevation_ft']} ft, QNH {qnh:g}, PA {pa:.0f} ft, "
-          f"OAT {oat:g} C, wind {wind_txt}")
+
+    print(f"\n{kind.upper()} {icao} - {mass:.0f} lb{note}")
+    print(f"  Runway {rwy['rwy']}, wind {wind_txt} ({side}wind {abs(head):.0f} kt, "
+          f"crosswind {cross:.0f} kt), OAT {oat:g} C, QNH {qnh:g}")
+    print(f"  Pressure altitude {site['pa']:.0f} ft, density altitude "
+          f"{site['da']:.0f} ft")
+
+    lookup = perf.takeoff if takeoff else perf.landing
+    (roll, total), speeds = lookup(ac["perf"], mass, site["pa"], oat)
     if roll is None:
-        print("  Outside the POH table (pressure altitude or temperature too "
-              "high) - no figures.")
-        return [f"{kind} {icao}: outside the POH performance table"]
-
+        print("  Outside the POH table (pressure altitude or temperature too high).")
+        return [f"{where}: outside the POH performance table"]
     if takeoff:
-        factor, grass_pct = perf.TAKEOFF_FACTOR, 0.15
-        print(f"  Short field, {data['takeoff_note']}: lift off {speeds[0]} "
-              f"KIAS, {speeds[1]} KIAS at 50 ft")
-        print(f"  POH (zero wind, paved): ground roll {roll:.0f} ft, "
-              f"to 50 ft {total:.0f} ft")
-        print(f"  {'RWY':5}{'Wind kt':>10}{'Run m':>8}{'TORA':>7}"
-              f"{'To 50ft m':>11}{'TODA':>7}")
+        print(f"  Short field, {data['takeoff_note']}: lift off {speeds[0]} KIAS, "
+              f"{speeds[1]} KIAS at 50 ft")
     else:
-        factor, grass_pct = perf.LANDING_FACTOR, 0.45
-        print(f"  Short field, {data['landing_note']}: {speeds[0]} KIAS "
-              "at 50 ft")
-        print(f"  POH (zero wind, paved): ground roll {roll:.0f} ft, "
-              f"from 50 ft {total:.0f} ft")
-        print(f"  {'RWY':5}{'Wind kt':>10}{'From 50ft m':>13}{'LDA':>7}")
+        print(f"  Short field, {data['landing_note']}: {speeds[0]} KIAS at 50 ft")
+    print(f"  POH (zero wind, paved): ground roll {roll:.0f} ft, "
+          f"50 ft {total:.0f} ft")
 
-    usable = []
-    for rwy in ad["runways"]:
-        bearing = rwy.get("bearing")
-        if bearing is None:
-            bearing = int(rwy["rwy"][:2]) * 10
-        head, cross = perf.wind_components(bearing, wind_dir, wind_kt)
-        run, dist = perf.corrected((roll, total), head, rwy["surface"] == "grass",
-                                   grass_pct)
-        run, dist = (x * factor * perf.M_PER_FT for x in (run, dist))
+    grass, grass_pct = rwy["surface"] == "grass", (0.15 if takeoff else 0.45)
+    change = (perf.wind_factor(head) - 1) * 100
+    notes = [f"{change:+.1f} % for the {side}wind" if abs(head) >= 0.5
+             else "no wind correction"]
+    if grass:
+        notes.append(f"+{grass_pct:.0%} of the ground roll for grass")
+    print("  Corrections: " + ", ".join(notes))
+    run, dist = (d * perf.M_PER_FT for d in
+                 perf.corrected((roll, total), head, grass, grass_pct))
 
-        status = []
-        if -head > perf.MAX_TAILWIND_KT:
-            status.append(f"tailwind over {perf.MAX_TAILWIND_KT} kt")
-        if cross > data["max_crosswind_kt"]:
-            status.append(f"crosswind over the {data['max_crosswind_kt']} kt "
-                          "demonstrated")
-        if takeoff and run > rwy["tora"]:
-            status.append("TORA too short")
-        if takeoff and dist > rwy["toda"]:
-            status.append("TODA too short")
-        if not takeoff and dist > rwy["lda"]:
-            status.append("LDA too short")
-        if not status:
-            usable.append(rwy["rwy"])
+    problems = []
 
-        wind_col = f"{'H' if head >= 0 else 'T'}{abs(head):.0f} X{cross:.0f}"
-        verdict = ", ".join(status) or "OK"
-        if takeoff:
-            print(f"  {rwy['rwy']:5}{wind_col:>10}{run:8.0f}{rwy['tora']:7}"
-                  f"{dist:11.0f}{rwy['toda']:7}  {verdict}")
-        else:
-            print(f"  {rwy['rwy']:5}{wind_col:>10}{dist:13.0f}{rwy['lda']:7}  "
-                  f"{verdict}")
-
-    grass = any(r["surface"] == "grass" for r in ad["runways"])
-    print(f"  (wind{', grass' if grass else ''} corrections and the "
-          f"x{factor:g} safety factor included; H = head, T = tail, X = cross)")
+    def check(label, need, name, available):
+        ok = need <= available
+        limit = f"{name} ({available:.0f} m)"
+        print(f"    {label:17}{need:6.0f} m  {'<' if ok else '>'}  {limit:24}"
+              f"{'OK' if ok else 'NOT OK'}")
+        if not ok:
+            problems.append(f"{where}: {label} {need:.0f} m is more than {limit}")
 
     if takeoff:
-        climb = perf.climb(ac["perf"], pa, oat)
-        if climb:
-            print(f"  Max rate of climb: {climb[1]:.0f} ft/min at {climb[0]} "
-                  "KIAS (POH, max weight, flaps up)")
-    if not usable:
-        return [f"{kind} {icao}: no runway within limits"]
-    return []
+        check("Ground roll", run, "TORA", rwy["tora"])
+        check("50 ft clearance", dist, "TODA", rwy["toda"])
+        if rwy["toda"] > rwy["tora"] or rwy["asda"] > rwy["tora"]:
+            check(f"50 ft x{perf.TODA_FACTOR:g}", dist * perf.TODA_FACTOR,
+                  "TODA", rwy["toda"])
+            check(f"50 ft x{perf.ASDA_FACTOR:g}", dist * perf.ASDA_FACTOR,
+                  "ASDA", rwy["asda"])
+        else:
+            check(f"50 ft x{perf.TORA_FACTOR:g}", dist * perf.TORA_FACTOR,
+                  "TORA/TODA/ASDA", rwy["tora"])
+    else:
+        check("Ground roll", run, "LDA", rwy["lda"])
+        check("50 ft clearance", dist, f"{perf.LDA_FRACTION:.0%} LDA",
+              rwy["lda"] * perf.LDA_FRACTION)
+
+    warnings = []
+    if -head > perf.MAX_TAILWIND_KT:
+        warnings.append(f"tailwind {-head:.0f} kt is more than the "
+                        f"{perf.MAX_TAILWIND_KT} kt the POH covers")
+    if cross > data["max_crosswind_kt"]:
+        warnings.append(f"crosswind {cross:.0f} kt is above the "
+                        f"{data['max_crosswind_kt']} kt maximum demonstrated")
+    for w in warnings:
+        print("  ! " + w)
+    return problems + [f"{where}: {w}" for w in warnings]
+
+
+def climb_report(ac, icao, site, obstacle):
+    """Max rate of climb after take-off and the optional obstacle clearance
+    (as on the school's sheet). Returns a list of problems."""
+    climb = perf.climb(ac["perf"], site["pa"], site["weather"][1])
+    if climb is None:
+        print("  Rate of climb: outside the POH table.")
+        return [f"climb {icao}: outside the POH table"] if obstacle else []
+    speed, roc = climb
+    print(f"  Max rate of climb {roc:.0f} ft/min at {speed} KIAS "
+          "(POH, max weight, flaps up)")
+    if not obstacle:
+        return []
+
+    nm, obstacle_ft, limit, gs = obstacle
+    minutes = nm / gs * 60
+    over = AERODROMES[icao]["elevation_ft"] + roc * minutes
+    print(f"\nCLEARANCE - obstacle {nm:g} NM from {icao}, {obstacle_ft:.0f} ft")
+    print(f"  Vclimb {speed} KIAS, GS {gs:g} kt, rate of climb {roc:.0f} ft/min")
+    print(f"  {nm:g} NM at {gs:g} kt = {minutes:.1f} min: climb {roc * minutes:.0f} ft"
+          f" -> {over:.0f} ft when reaching the obstacle")
+    if limit is not None and over > limit:
+        over = limit
+        print(f"  Altitude limit {limit:.0f} ft -> cross the obstacle at "
+              f"{limit:.0f} ft")
+    clearance = over - obstacle_ft
+    ok = clearance > 0
+    print(f"  Clearance {clearance:.0f} ft  {'OK' if ok else 'NOT OK'}")
+    return [] if ok else [f"obstacle after take-off {icao}: clearance "
+                          f"{clearance:.0f} ft"]
 
 
 def main():
@@ -429,23 +511,30 @@ def main():
 
     # ---------------------------------------------------- performance --
     mass = {name: w for name, w, _, _ in conditions}
-    checks = [("take-off", DEPARTURE, mass["TOM"]),
-              ("landing", dest, mass["LM"]),
-              ("landing at alternate", alt_icao, mass["ALT"])]
-    checks = [c for c in checks if c[1]]        # skip "Other" places
-    print(f"\nPERFORMANCE (POH short field; safety factor x{perf.TAKEOFF_FACTOR:g} "
-          f"take-off, x{perf.LANDING_FACTOR:g} landing)")
-    weather, previous = {}, None
-    for icao in dict.fromkeys(c[1] for c in checks):
+    print("\nPERFORMANCE (POH short field)")
+    sites, previous, obstacle = {}, None, None
+    for icao in dict.fromkeys(i for i in (DEPARTURE, dest, alt_icao) if i):
         missing = missing_data(icao)
         if missing:
             print(f"{icao}: {missing} in aerodromes.py - no runway check there.")
             continue
-        weather[icao] = ask_weather(icao, previous)
-        previous = (icao, weather[icao])
-    for kind, icao, m in checks:
-        if icao in weather:
-            problems += runway_check(ac, kind, icao, m, weather[icao])
+        sites[icao] = ask_site(icao, previous)
+        previous = (icao, sites[icao]["weather"])
+        if icao == DEPARTURE:
+            climb = perf.climb(ac["perf"], sites[icao]["pa"], previous[1][1])
+            if climb:
+                obstacle = ask_obstacle(climb[0])
+
+    checks = [("take-off", DEPARTURE, mass["TOM"], ""),
+              ("landing", dest, mass["LM"], ""),
+              ("take-off", alt_icao, mass["TOM"],
+               " (alternate, at TOM as if refuelled)"),
+              ("landing", alt_icao, mass["ALT"], " (alternate)")]
+    for kind, icao, m, note in checks:
+        if icao in sites:
+            problems += runway_report(ac, kind, icao, m, sites[icao], note)
+            if kind == "take-off" and icao == DEPARTURE:
+                problems += climb_report(ac, icao, sites[icao], obstacle)
 
     if problems:
         print("\nNOT WITHIN LIMITS:")

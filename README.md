@@ -29,34 +29,43 @@ masses against the maximum masses and the CG envelope:
 
 It also shows how much fuel is left at the alternate.
 
-**Performance.** It asks for the QNH, OAT and wind at each aerodrome. Press Enter on the QNH to
-reuse the previous aerodrome's weather. It then works out these figures from the POH
-short-field tables:
+**Performance.** It follows the school's performance sheet. For each aerodrome it asks:
 
-- take-off at LPPM with the TOM
+- the QNH, OAT and wind (press Enter on the QNH to reuse the previous aerodrome's weather)
+- the runway in use (press Enter for the one most into wind)
+
+At departure it also asks about an optional obstacle after take-off. It then works out, from the
+POH short-field tables:
+
+- take-off at LPPM with the TOM, the maximum rate of climb, and the obstacle clearance
 - landing at the destination with the LM
-- landing at the alternate with the mass there
+- take-off at the alternate with the TOM (as if refuelled), and landing there with the mass at the
+  alternate
 
-For every runway it shows:
+For each one it shows the runway, the head/tail and cross wind, the pressure and density altitude,
+the POH figures and the corrections. Then come the same checks as on the sheet:
 
-- the headwind or tailwind and the crosswind
-- the take-off run against TORA, and the distance to 50 ft against TODA
-- the landing distance from 50 ft against LDA
-- the maximum rate of climb at departure
+| | Check |
+|---|---|
+| Take-off | ground roll < TORA, 50 ft distance < TODA |
+| Take-off, runway with clearway or stopway | also 50 ft ×1.15 < TODA and 50 ft ×1.3 < ASDA |
+| Take-off, runway without them | also 50 ft ×1.25 < TORA/TODA/ASDA |
+| Landing | ground roll < LDA, 50 ft distance < 70 % of LDA |
+| Obstacle clearance | altitude at the obstacle = elevation + rate of climb × time to the obstacle at the climb ground speed, capped by the altitude limit, minus the obstacle elevation |
 
-It flags anything outside limits.
+It flags anything outside limits, and also a tailwind above 10 kt or a crosswind above the maximum
+demonstrated (12 kt C152, 15 kt C172P).
 
-How the performance figures are worked out (all in `performance.py`):
+How the figures are worked out (all in `performance.py`):
 
 - **POH tables:** C152 1980 POH and C172P 1980 POH (rev. 2), Section 5, short-field technique.
   The C172P take-off is interpolated between the 2000, 2200 and 2400 lb tables.
 - **Wind:** −10 % for each 9 kt of headwind, +10 % for each 2 kt of tailwind (up to 10 kt), as in
   the POH notes.
 - **Grass:** +15 % (take-off) or +45 % (landing) of the ground roll, as in the POH notes.
-- **Safety factors:** ×1.33 on take-off and ×1.43 on landing (UK CAA Safety Sense 7). Set
-  `TAKEOFF_FACTOR` / `LANDING_FACTOR` to `1.0` to compare plain POH numbers.
-- **Crosswind:** flagged above the maximum demonstrated (12 kt C152, 15 kt C172P).
-- **Pressure altitude:** elevation + (1013 − QNH) × 30 ft.
+- **Pressure altitude:** elevation + (1013 − QNH) × 27 ft.
+- **Density altitude:** PA + 120 ft for each °C above ISA.
+- **Factors:** `TODA_FACTOR`, `ASDA_FACTOR`, `TORA_FACTOR`, `LDA_FRACTION`.
 - **Reading the tables:** values between table entries are interpolated. Set `NEXT_HIGHER = True`
   to read the table at the next higher weight, altitude and temperature instead, the
   conservative method the POH uses in its sample problem.
@@ -80,7 +89,7 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
 
    Update them whenever the aircraft is re-weighed or its equipment changes.
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
-   LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
+   ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are
    skipped. Check the data again every AIRAC cycle.
 

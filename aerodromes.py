@@ -12,7 +12,7 @@ For each runway direction add one line to "runways":
     rwy      designator, e.g. "29"
     bearing  true bearing in degrees, for the wind components
              (None = use the designator x 10)
-    tora, toda, lda   declared distances in metres
+    tora, toda, asda, lda   declared distances in metres
     surface  "paved" or "grass"
 """
 
@@ -25,7 +25,7 @@ AERODROMES = {
         "nm_from_departure": 0,
         "elevation_ft": None,
         "runways": [
-            # {"rwy": "..", "bearing": None, "tora": ..., "toda": ..., "lda": ..., "surface": "paved"},
+            # {"rwy": "..", "bearing": None, "tora": ..., "toda": ..., "asda": ..., "lda": ..., "surface": "paved"},
         ],
     },
     "LPFR": {
@@ -51,6 +51,6 @@ def missing_data(icao):
     if ad["elevation_ft"] is None or not ad["runways"]:
         return "elevation and runways not filled in yet"
     for rwy in ad["runways"]:
-        if None in (rwy.get("tora"), rwy.get("toda"), rwy.get("lda")):
+        if None in (rwy.get(k) for k in ("tora", "toda", "asda", "lda")):
             return f"RWY {rwy.get('rwy')} declared distances not filled in yet"
     return ""
