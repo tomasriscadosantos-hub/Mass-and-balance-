@@ -100,6 +100,10 @@ them directly. In the app, the Weather and NOTAMs panel shows each report with i
 
 None of this replaces the official briefing.
 
+**What's new.** After an update the app shows, once, a note with what changed; "What's new" at the
+bottom of the page opens it again. The notes are in `web/js/changes.js`. When publishing a change,
+add an entry at the top with the next id, and bump `VERSION` in `web/sw.js`.
+
 **Towards an app.** For the App Store or Google Play the same folder can be wrapped with
 Capacitor, which uses it as the app's content.
 

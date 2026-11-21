@@ -1,6 +1,6 @@
 // Offline support: keeps a copy of the app so it opens without signal at the
 // airfield. Bump VERSION whenever any file below changes.
-const VERSION = "mb-lppm-7";
+const VERSION = "mb-lppm-8";
 const FILES = [
   "./",
   "index.html",
@@ -9,6 +9,7 @@ const FILES = [
   "js/data.js",
   "js/poh.js",
   "js/calc.js",
+  "js/changes.js",
   "js/app.js",
   "icons/icon-192.png",
   "icons/icon-512.png",

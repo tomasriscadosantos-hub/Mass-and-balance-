@@ -1357,6 +1357,95 @@
     renderIppc();
   }
 
+  // ------------------------------------------------------------ what's new
+
+  // Shown once after an update: the entries in changes.js this phone hasn't
+  // seen yet. The footer button shows all of them.
+  var SEEN_KEY = "lppm-mass-balance-seen-update";
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function longDate(iso) {
+    var p = iso.split("-");
+    return Number(p[2]) + " " + MONTHS[Number(p[1]) - 1] + " " + p[0];
+  }
+
+  function readSeen() {
+    try {
+      var v = localStorage.getItem(SEEN_KEY);
+      return v === null ? null : Number(v);
+    } catch (e) {
+      return undefined; // no storage here: don't show the note on every visit
+    }
+  }
+  function writeSeen(id) {
+    try {
+      localStorage.setItem(SEEN_KEY, String(id));
+    } catch (e) {
+      /* nothing to remember it in */
+    }
+  }
+
+  function showWhatsNew(entries, all) {
+    var dlg = $("whatsnew");
+    $("wn-kicker").textContent = all ? "All updates" : "Update of " + longDate(entries[0].date);
+    var html = "";
+    var i = 0;
+    entries.forEach(function (entry, k) {
+      if (all || entries.length > 1) {
+        html += '<p class="changes-date">' + (k === 0 ? "Latest · " : "") + longDate(entry.date) + "</p>";
+      }
+      html += '<ol class="changes">';
+      entry.items.forEach(function (item, n) {
+        html += '<li style="--i:' + i++ + '"><span class="n">' + pad(n + 1, 2) + '</span><span class="t">' +
+          esc(item.title) + '</span><span class="d">' + esc(item.text) + "</span></li>";
+      });
+      html += "</ol>";
+    });
+    $("wn-body").innerHTML = html;
+    $("wn-body").scrollTop = 0;
+    if (typeof dlg.showModal === "function") {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute("open", "");
+    }
+  }
+
+  var latestUpdate = null;
+
+  function closeWhatsNew() {
+    var dlg = $("whatsnew");
+    if (typeof dlg.close === "function") {
+      dlg.close(); // the "close" event remembers it
+    } else {
+      dlg.removeAttribute("open");
+      writeSeen(latestUpdate);
+    }
+  }
+
+  function initWhatsNew() {
+    var list = MB.changes || [];
+    if (!list.length) return;
+    var latest = (latestUpdate = list[0].id);
+    var dlg = $("whatsnew");
+    $("whatsnew-open").addEventListener("click", function () {
+      showWhatsNew(list, true);
+    });
+    $("wn-close").addEventListener("click", closeWhatsNew);
+    dlg.addEventListener("click", function (e) {
+      if (e.target === dlg) closeWhatsNew(); // tap outside the card
+    });
+    dlg.addEventListener("close", function () {
+      writeSeen(latest);
+    });
+    var seen = readSeen();
+    if (seen === undefined) return;
+    // Never seen a note: show the latest update only.
+    var fresh = list.filter(function (c) {
+      return seen === null ? c.id === latest : c.id > seen;
+    });
+    if (fresh.length) showWhatsNew(fresh, false);
+  }
+
   // ---------------------------------------------------------------- start
 
   buildAircraft();
@@ -1369,6 +1458,7 @@
   bindBriefing();
   update();
   loadWeather();
+  initWhatsNew();
 
   var resizeTimer = null;
   window.addEventListener("resize", function () {
