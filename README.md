@@ -64,9 +64,25 @@ The tests compare the results with:
 - the previous school's performance sheet
 - the Python version
 
-**Towards an app.** The `web` folder is already an installable web app: open it from a web
-address on the phone and use "Add to Home Screen". For the App Store or Google Play it can be
-wrapped with Capacitor, which uses this folder as the app's content.
+**Install on a phone (GitHub Pages).** `.github/workflows/pages.yml` publishes `web/` to
+<https://tomasriscadosantos-hub.github.io/Mass-and-balance-/>. It does this every time something
+in `web/` changes on the default branch, after the tests pass. You can also start it by hand from
+the Actions tab ("Deploy web app", "Run workflow"). One-time setup in the repository settings:
+
+1. Pages needs a public repository, or a paid GitHub plan for a private one. The published site
+   is public either way.
+2. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
+
+Then open the address on the phone:
+
+- iPhone: Safari → Share → Add to Home Screen.
+- Android: Chrome → menu → Install app.
+
+Once opened, it also works without signal. After an update it loads the new version the next
+time it's opened with signal.
+
+**Towards an app.** For the App Store or Google Play the same folder can be wrapped with
+Capacitor, which uses it as the app's content.
 
 **Two copies of the data.** Aircraft and aerodrome data is in `web/js/data.js` and also in the
 Python files. Update both, or retire the Python version.
