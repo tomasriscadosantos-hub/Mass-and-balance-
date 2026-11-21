@@ -1,6 +1,7 @@
 // Offline support: keeps a copy of the app so it opens without signal at the
-// airfield. Bump VERSION whenever any file below changes.
-const VERSION = "mb-lppm-8";
+// airfield. Bump VERSION whenever any file below changes: that is what tells
+// installed apps there is an update (the page then reloads itself once).
+const VERSION = "mb-lppm-9";
 const FILES = [
   "./",
   "index.html",
@@ -16,8 +17,13 @@ const FILES = [
   "icons/apple-touch-icon.png",
 ];
 
+// GitHub Pages lets browsers keep files for 10 minutes. "reload" and
+// "no-cache" ask the server every time, so an update is never missed.
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(FILES)));
+  event.waitUntil(
+    caches.open(VERSION).then((cache) =>
+      cache.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
+  );
   self.skipWaiting();
 });
 
@@ -36,9 +42,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== location.origin) return; // fonts and other sites: the browser handles them
   if (url.pathname.endsWith("/weather.json")) return; // weather is never served from the cache
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-cache" })
       .then((response) => {
-        if (response.ok && new URL(event.request.url).origin === location.origin) {
+        if (response.ok) {
           const copy = response.clone();
           caches.open(VERSION).then((cache) => cache.put(event.request, copy));
         }

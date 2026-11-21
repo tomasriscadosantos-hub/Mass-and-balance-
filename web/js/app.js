@@ -1388,14 +1388,21 @@
   function showWhatsNew(entries, all) {
     var dlg = $("whatsnew");
     $("wn-kicker").textContent = all ? "All updates" : "Update of " + longDate(entries[0].date);
+    // One list per day, newest first.
+    var days = [];
+    entries.forEach(function (entry) {
+      var day = days[days.length - 1];
+      if (!day || day.date !== entry.date) days.push((day = { date: entry.date, items: [] }));
+      day.items = day.items.concat(entry.items);
+    });
     var html = "";
     var i = 0;
-    entries.forEach(function (entry, k) {
-      if (all || entries.length > 1) {
-        html += '<p class="changes-date">' + (k === 0 ? "Latest · " : "") + longDate(entry.date) + "</p>";
+    days.forEach(function (day, k) {
+      if (all || days.length > 1) {
+        html += '<p class="changes-date">' + (k === 0 ? "Latest · " : "") + longDate(day.date) + "</p>";
       }
       html += '<ol class="changes">';
-      entry.items.forEach(function (item, n) {
+      day.items.forEach(function (item, n) {
         html += '<li style="--i:' + i++ + '"><span class="n">' + pad(n + 1, 2) + '</span><span class="t">' +
           esc(item.title) + '</span><span class="d">' + esc(item.text) + "</span></li>";
       });
@@ -1439,9 +1446,9 @@
     });
     var seen = readSeen();
     if (seen === undefined) return;
-    // Never seen a note: show the latest update only.
+    // Never seen a note: show the latest day's updates only.
     var fresh = list.filter(function (c) {
-      return seen === null ? c.id === latest : c.id > seen;
+      return seen === null ? c.date === list[0].date : c.id > seen;
     });
     if (fresh.length) showWhatsNew(fresh, false);
   }
@@ -1469,13 +1476,29 @@
   });
 
   // Offline mode where the page is hosted normally (not inside previews).
+  // It also looks for an update each time the app comes back on screen, and
+  // reloads once when a new version takes over (inputs are saved as you type).
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
-    window.addEventListener("load", function () {
-      try {
-        navigator.serviceWorker.register("sw.js").catch(function () {});
-      } catch (e) {
-        /* not allowed here; the page works anyway */
-      }
-    });
+    try {
+      var sw = navigator.serviceWorker;
+      var hadVersion = !!sw.controller; // false on the very first visit: nothing to reload
+      var reloading = false;
+      sw.addEventListener("controllerchange", function () {
+        if (!hadVersion || reloading) return;
+        reloading = true;
+        location.reload();
+      });
+      window.addEventListener("load", function () {
+        sw.register("sw.js")
+          .then(function (reg) {
+            document.addEventListener("visibilitychange", function () {
+              if (document.visibilityState === "visible") reg.update().catch(function () {});
+            });
+          })
+          .catch(function () {});
+      });
+    } catch (e) {
+      /* not allowed here; the page works anyway */
+    }
   }
 })();

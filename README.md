@@ -3,8 +3,8 @@
 Mass and balance and take-off / landing performance for the school's two aircraft. It
 comes in two versions:
 
-- `web/`: a web app (HTML, CSS and JavaScript, no build step), made for phones. It is the base
-  for a future app.
+- `web/`: the LPPM Flight web app (HTML, CSS and JavaScript, no build step), made for phones. It
+  is the base for a future app.
 - `mass_and_balance.py`: the original terminal version.
 
 ## Web app
@@ -78,8 +78,9 @@ Then open the address on the phone:
 - iPhone: Safari → Share → Add to Home Screen.
 - Android: Chrome → menu → Install app.
 
-Once opened, it also works without signal. After an update it loads the new version the next
-time it's opened with signal.
+Once opened, it also works without signal. After an update (a new `VERSION` in `web/sw.js`) the
+app loads the new version by itself the next time it comes on screen with signal, keeping the
+inputs.
 
 **Weather and NOTAMs.** The deploy workflow also runs every 15 minutes. It downloads the latest
 METARs and TAFs for the app's aerodromes from aviationweather.gov, and the latest readings of the

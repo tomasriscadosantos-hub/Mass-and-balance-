@@ -11,6 +11,20 @@
 
   var CHANGES = [
     {
+      id: 2,
+      date: "2026-11-21",
+      items: [
+        {
+          title: "New name: LPPM Flight",
+          text: "The icon on your home screen keeps its old name until you add the app again from Safari.",
+        },
+        {
+          title: "Updates arrive by themselves",
+          text: "When there's a new version, the app loads it as soon as you open it. Your inputs stay.",
+        },
+      ],
+    },
+    {
       id: 1,
       date: "2026-11-21",
       items: [

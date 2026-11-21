@@ -1,6 +1,6 @@
 {
-  "name": "LPPM Mass & Balance",
-  "short_name": "M&B LPPM",
+  "name": "LPPM Flight",
+  "short_name": "LPPM Flight",
   "description": "Mass and balance and take-off / landing performance for OK-HAD (C152) and OK-KUN (C172P) from Portimão.",
   "start_url": "./",
   "scope": "./",
