@@ -1,7 +1,54 @@
 # Mass and Balance
 
-A terminal calculator for the school's two aircraft. It does the mass and balance and the
-take-off and landing performance.
+Mass and balance and take-off / landing performance for the school's two aircraft. It
+comes in two versions:
+
+- `web/`: a web app (HTML, CSS and JavaScript, no build step), made for phones. It is the base
+  for a future app.
+- `mass_and_balance.py`: the original terminal version.
+
+## Web app
+
+Open `web/index.html` in a browser, or serve the folder so that offline mode also works:
+
+```
+cd web
+python3 -m http.server 8000      # then open http://localhost:8000
+```
+
+It recalculates as you type, keeps your last inputs on the device, and once it has been served
+over http(s) and opened once it also works without signal.
+
+On top of the terminal version it adds:
+
+- the CG moment envelope chart, like the one in POH section 6
+- a summary at the top, with problems marked in red and checks it could not do in amber
+
+| File | What it holds |
+|---|---|
+| `js/data.js` | Aircraft (weighing, arms, limits, fuel) and aerodromes (AIP data). The file to keep up to date. |
+| `js/poh.js` | POH section 5 tables |
+| `js/calc.js` | All the calculations, no page code |
+| `js/app.js` | The page |
+| `sw.js`, `manifest.webmanifest`, `icons/` | Offline mode and "Add to Home Screen" |
+
+Tests (Node 18 or newer):
+
+```
+node --test "web/tests/*.test.js"
+```
+
+The tests compare the results with the POH sample problem, the school's performance sheet and
+the Python version.
+
+**Towards an app.** The `web` folder is already an installable web app: open it from a web
+address on the phone and use "Add to Home Screen". For the App Store or Google Play it can be
+wrapped with Capacitor, which uses this folder as the app's content.
+
+**Two copies of the data.** Aircraft and aerodrome data is in `web/js/data.js` and also in the
+Python files. Update both, or retire the Python version.
+
+## Terminal version
 
 | Aircraft | Type        |
 |----------|-------------|
