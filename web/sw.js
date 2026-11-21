@@ -1,6 +1,6 @@
 // Offline support: keeps a copy of the app so it opens without signal at the
 // airfield. Bump VERSION whenever any file below changes.
-const VERSION = "mb-lppm-4";
+const VERSION = "mb-lppm-5";
 const FILES = [
   "./",
   "index.html",
@@ -31,6 +31,9 @@ self.addEventListener("activate", (event) => {
 // Network first, so updates show up straight away; the cache when offline.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== location.origin) return; // fonts and other sites: the browser handles them
+  if (url.pathname.endsWith("/weather.json")) return; // weather is never served from the cache
   event.respondWith(
     fetch(event.request)
       .then((response) => {

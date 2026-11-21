@@ -372,6 +372,17 @@ table.data tr.minus td { color: var(--muted); }
 .report table.data td.status { width: 1%; }
 .report .warnline { color: var(--bad); font-weight: 500; }
 
+.briefing { display: grid; gap: 10px; min-width: 0; }
+.wx-report { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.wx-report-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wx-report-title { font: 700 var(--step-0) var(--font-display); letter-spacing: 0.04em; }
+.wx-report p { margin: 0; font-size: var(--step--1); }
+.wx-raw { margin: 0; font: 400 0.8rem/1.45 var(--font-data); white-space: pre-wrap; overflow-wrap: anywhere; }
+.wx-report details summary { cursor: pointer; font-size: var(--step--1); color: var(--muted); min-height: 28px; display: flex; align-items: center; }
+.wx-report .btn-ghost { justify-self: start; min-height: 40px; }
+.notams { display: grid; gap: 6px; justify-items: start; }
+a.btn-ghost { display: inline-flex; align-items: center; text-decoration: none; }
+
 details.method { font-size: var(--step--1); color: var(--muted); }
 details.method summary { cursor: pointer; font-weight: 600; color: var(--ink); min-height: 32px; display: flex; align-items: center; }
 details.method ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; max-width: 65ch; }

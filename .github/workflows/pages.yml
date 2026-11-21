@@ -1,12 +1,17 @@
-# Publishes the web app (web/) to GitHub Pages so it can be installed on a phone.
-# Runs when anything in web/ changes on the default branch, or by hand from the
-# Actions tab ("Run workflow"). The tests must pass before anything is published.
+# Publishes the web app (web/) to GitHub Pages so it can be installed on a phone,
+# together with the latest METARs and TAFs (weather.json).
+#
+# Runs when anything in web/ changes on the default branch, every 30 minutes to
+# refresh the weather, or by hand from the Actions tab ("Run workflow").
+# The tests must pass before a change to the app is published.
 name: Deploy web app
 
 on:
   push:
     branches: [claude/eager-brahmagupta-cii6jq, main]
-    paths: ["web/**"]
+    paths: ["web/**", ".github/scripts/**"]
+  schedule:
+    - cron: "7,37 * * * *" # a few minutes after the half-hourly METARs
   workflow_dispatch:
 
 permissions:
@@ -20,6 +25,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event_name != 'schedule' # the weather refresh doesn't change the app
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,16 +36,22 @@ jobs:
 
   deploy:
     needs: test
+    if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Copy the app without its tests
         run: |
           cp -r web _site
-          rm -rf _site/tests
+          rm -rf _site/tests _site/weather.json
+      - name: Download METARs and TAFs
+        run: node .github/scripts/fetch-weather.js _site/weather.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

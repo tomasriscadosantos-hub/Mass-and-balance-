@@ -292,3 +292,31 @@ test("no runway data: zero wind, nothing checked, no wind warnings", () => {
   assert.deepEqual(r.warnings, []);
   near(r.dist, calc.takeoff("C152", 1670, 5, 20).total * 0.3048, 1e-9, "zero-wind distance");
 });
+
+test("METAR reader", () => {
+  const faro = calc.parseMetar("METAR LPFR 211600Z 20007KT 9999 SCT015 BKN020 20/17 Q1017");
+  assert.equal(faro.icao, "LPFR");
+  assert.deepEqual([faro.day, faro.hour, faro.minute], [21, 16, 0]);
+  assert.deepEqual(faro.wind, { dir: 200, kt: 7, gust: null, variable: false });
+  assert.equal(faro.visKm, 10);
+  assert.equal(faro.ceilFt, 2000); // SCT015 is not a ceiling, BKN020 is
+  assert.deepEqual([faro.tempC, faro.dewC, faro.qnh], [20, 17, 1017]);
+
+  const gusty = calc.parseMetar("LPBJ 211630Z 27015G25KT 240V300 4000 -RA BKN008 OVC015 12/11 Q1009 TEMPO 2000 BKN004");
+  assert.deepEqual(gusty.wind, { dir: 270, kt: 15, gust: 25, variable: false });
+  assert.equal(gusty.visKm, 4);
+  assert.equal(gusty.ceilFt, 800); // trend after TEMPO is ignored
+
+  const cavok = calc.parseMetar("METAR LPFR 210630Z VRB03KT CAVOK M01/M03 Q1030 NOSIG");
+  assert.equal(cavok.wind.variable, true);
+  assert.equal(cavok.wind.dir, null);
+  assert.equal(cavok.cavok, true);
+  assert.equal(cavok.visKm, 10);
+  assert.equal(cavok.ceilFt, Infinity);
+  assert.deepEqual([cavok.tempC, cavok.dewC], [-1, -3]);
+
+  const fog = calc.parseMetar("METAR LPBJ 210700Z 00000KT 0800 FG VV002 05/05 Q1025");
+  assert.deepEqual([fog.wind.kt, fog.visKm, fog.ceilFt], [0, 0.8, 200]);
+  const mps = calc.parseMetar("METAR XXXX 211600Z 18010MPS 9999 NSC 15/10 A2992");
+  assert.deepEqual([mps.wind.kt, mps.ceilFt, mps.qnh], [19, Infinity, 1013]);
+});

@@ -81,6 +81,20 @@ Then open the address on the phone:
 Once opened, it also works without signal. After an update it loads the new version the next
 time it's opened with signal.
 
+**Weather and NOTAMs.** The deploy workflow also runs every 30 minutes. It downloads the latest
+METARs and TAFs for the app's aerodromes from aviationweather.gov and publishes them with the app
+as `weather.json`, because the weather service doesn't let web pages on other sites read it
+directly. In the app, the Weather and NOTAMs panel shows each report with its age:
+
+- **Fill:** puts a METAR's values (QNH, OAT, wind and gusts, visibility, ceiling) into that
+  aerodrome's weather fields.
+- **Nearest report:** LPPM and LPEV publish no METAR, so the panel offers the nearest one (LPFR,
+  LPBJ) as a guide.
+- **NOTAMs in IPPC:** copies the route's ICAO codes and opens IPPC (ippc.no) to paste them into the
+  aerodrome briefing. IPPC has no data service the app could read NOTAMs from.
+
+None of this replaces the official briefing.
+
 **Towards an app.** For the App Store or Google Play the same folder can be wrapped with
 Capacitor, which uses it as the app's content.
 

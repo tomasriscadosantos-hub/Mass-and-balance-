@@ -534,6 +534,64 @@
     return result;
   }
 
+  /*
+   * Reads the parts of a METAR the app needs: wind (dir null when variable),
+   * visibility (km), ceiling (lowest BKN/OVC/VV in ft above the aerodrome,
+   * Infinity when none), temperature, dew point and QNH. Stops at the trend
+   * (TEMPO, BECMG, NOSIG) and the remarks.
+   */
+  function parseMetar(raw) {
+    var tokens = String(raw).trim().replace(/=$/, "").split(/\s+/);
+    var out = { raw: raw, icao: null, wind: null, visKm: null, cavok: false, clouds: [],
+      tempC: null, dewC: null, qnh: null };
+    var i = 0;
+    if (tokens[i] === "METAR" || tokens[i] === "SPECI") i++;
+    out.icao = tokens[i++] || null;
+    var t = /^(\d{2})(\d{2})(\d{2})Z$/.exec(tokens[i] || "");
+    if (t) {
+      out.day = Number(t[1]);
+      out.hour = Number(t[2]);
+      out.minute = Number(t[3]);
+      i++;
+    }
+    function temp(s) {
+      return s.charAt(0) === "M" ? -Number(s.slice(1)) : Number(s);
+    }
+    for (; i < tokens.length; i++) {
+      var tok = tokens[i];
+      var m;
+      if (/^(TEMPO|BECMG|NOSIG|RMK)$/.test(tok)) break;
+      if (!out.wind && (m = /^(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)$/.exec(tok))) {
+        var f = m[4] === "MPS" ? 1.94384 : 1;
+        out.wind = { dir: m[1] === "VRB" ? null : Number(m[1]), kt: Math.round(Number(m[2]) * f),
+          gust: m[3] ? Math.round(Number(m[3]) * f) : null, variable: m[1] === "VRB" };
+      } else if (tok === "CAVOK") {
+        out.cavok = true;
+        out.visKm = 10;
+      } else if (out.visKm === null && (m = /^(\d{4})(NDV|[NSEW]{1,2})?$/.exec(tok))) {
+        out.visKm = m[1] === "9999" ? 10 : Number(m[1]) / 1000;
+      } else if (out.visKm === null && (m = /^P?(\d+)SM$/.exec(tok))) {
+        out.visKm = Number(m[1]) * 1.609;
+      } else if ((m = /^(FEW|SCT|BKN|OVC|VV)(\d{3}|\/\/\/)/.exec(tok))) {
+        out.clouds.push({ cover: m[1], baseFt: m[2] === "///" ? null : Number(m[2]) * 100 });
+      } else if ((m = /^(M?\d{2})\/(M?\d{2})?$/.exec(tok))) {
+        out.tempC = temp(m[1]);
+        out.dewC = m[2] ? temp(m[2]) : null;
+      } else if ((m = /^Q(\d{4})$/.exec(tok))) {
+        out.qnh = Number(m[1]);
+      } else if ((m = /^A(\d{4})$/.exec(tok))) {
+        out.qnh = Math.round((Number(m[1]) / 100) * 33.8639);
+      }
+    }
+    var bases = out.clouds.filter(function (c) {
+      return /^(BKN|OVC|VV)$/.test(c.cover) && c.baseFt !== null;
+    }).map(function (c) {
+      return c.baseFt;
+    });
+    out.ceilFt = bases.length ? Math.min.apply(null, bases) : Infinity;
+    return out;
+  }
+
   // OM C 5: visibility (km) and ceiling (ft AGL, Infinity = none) against the
   // student solo minima, local (aerodrome) or cross-country.
   function minimaCheck(crossCountry, visKm, ceilFt) {
@@ -680,6 +738,7 @@
     runwayCheck: runwayCheck,
     climbCheck: climbCheck,
     minimaCheck: minimaCheck,
+    parseMetar: parseMetar,
     sunTimes: sunTimes,
     sunsetUtcMin: sunsetUtcMin,
     daylight: daylight,

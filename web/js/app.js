@@ -1116,6 +1116,171 @@
       "C172P (1980, rev. 2). " + parts.join(" · ") + ".";
   }
 
+  // ------------------------------------------------- weather and NOTAMs
+
+  var wx = { data: null, error: "", loading: false, filled: {} };
+
+  // weather.json is published with the app by the deploy workflow (every ~30 min).
+  function loadWeather() {
+    wx.loading = true;
+    renderBriefing();
+    fetch("weather.json?t=" + Date.now(), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        wx.data = data;
+        wx.error = data.error ? "The weather service didn't answer at the last update." : "";
+      })
+      .catch(function () {
+        wx.error = "No weather here. It needs signal and the installed app (not the preview).";
+      })
+      .then(function () {
+        wx.loading = false;
+        renderBriefing();
+      });
+  }
+
+  function routeAerodromes() {
+    var list = [];
+    [DEP, state.dest, state.alt].forEach(function (icao) {
+      if (icao && icao !== OTHER && list.indexOf(icao) < 0) list.push(icao);
+    });
+    return list;
+  }
+
+  function ageText(iso) {
+    var minutes = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (!isFinite(minutes)) return "";
+    if (minutes < 1) return "just now";
+    if (minutes < 120) return minutes + " min ago";
+    return Math.round(minutes / 60) + " h ago";
+  }
+  function utcTime(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? "" : clock(d.getUTCHours() * 60 + d.getUTCMinutes()) + " UTC";
+  }
+
+  function reportFor(list, icao) {
+    return (list || []).filter(function (r) {
+      return r.icao === icao;
+    })[0];
+  }
+
+  // Nearest aerodrome in the app's list that has a METAR.
+  function nearestMetar(icao) {
+    var best = null;
+    (wx.data.metars || []).forEach(function (m) {
+      var ad = D.AERODROMES[m.icao];
+      if (!ad || m.icao === icao) return;
+      var nm = calc.distanceNm(D.AERODROMES[icao], ad);
+      if (!best || nm < best.nm) best = { metar: m, nm: nm };
+    });
+    return best;
+  }
+
+  function renderBriefing() {
+    var box = $("briefing");
+    if (wx.loading && !wx.data) {
+      box.innerHTML = '<p class="hint">Loading the latest reports…</p>';
+      return;
+    }
+    if (!wx.data) {
+      box.innerHTML = '<p class="missing">' + esc(wx.error) + "</p>";
+      return;
+    }
+    var html = wx.error ? '<p class="missing">' + esc(wx.error) + "</p>" : "";
+    routeAerodromes().forEach(function (icao) {
+      var own = reportFor(wx.data.metars, icao);
+      var near = own ? null : nearestMetar(icao);
+      var metar = own || (near && near.metar);
+      var taf = reportFor(wx.data.tafs, metar ? metar.icao : icao);
+      html += '<div class="wx-report"><div class="wx-report-head"><span class="wx-report-title">' + icao + " · " +
+        esc(D.AERODROMES[icao].name) + "</span>";
+      if (metar) {
+        var old = (Date.now() - Date.parse(metar.time)) / 60000 > 60;
+        html += '<span class="chip ' + (old ? "chip-warn" : "chip-ok") + '">' + esc(utcTime(metar.time)) + ", " +
+          esc(ageText(metar.time)) + "</span>";
+      }
+      html += "</div>";
+      if (!metar) {
+        html += "<p>No METAR for " + icao + " or anywhere nearby in the data.</p></div>";
+        return;
+      }
+      if (!own) {
+        html += "<p>No METAR from " + icao + ". Nearest report: <strong>" + metar.icao + "</strong>, " +
+          n(near.nm, 0) + " NM away. Use it only as a guide for " + icao + ".</p>";
+      }
+      html += '<p class="wx-raw">' + esc(metar.raw) + "</p>";
+      if (taf) {
+        html += "<details><summary>TAF " + metar.icao + ", issued " + esc(utcTime(taf.issued)) + '</summary><p class="wx-raw">' +
+          esc(taf.raw) + "</p></details>";
+      }
+      html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao + '">' +
+        (own ? "Fill " + icao + " weather" : "Fill " + icao + " weather from " + metar.icao) + "</button>";
+      if (wx.filled[icao]) html += '<p class="hint">' + esc(wx.filled[icao]) + "</p>";
+      html += "</div>";
+    });
+    box.innerHTML = html;
+  }
+
+  // Put a METAR's values into an aerodrome's weather fields.
+  function fillWeather(icao, fromIcao) {
+    var metar = reportFor(wx.data && wx.data.metars, fromIcao);
+    if (!metar) return;
+    var p = calc.parseMetar(metar.raw);
+    var w = state.wx[icao];
+    if (p.qnh !== null) w.qnh = String(p.qnh);
+    if (p.tempC !== null) w.oat = String(p.tempC);
+    if (p.wind) {
+      w.dir = p.wind.dir === null || p.wind.kt === 0 ? "" : String(p.wind.dir);
+      w.kt = String(p.wind.kt);
+      w.gust = p.wind.gust === null ? "" : String(p.wind.gust);
+    }
+    if (p.visKm !== null) w.vis = p.cavok ? "cavok" : n(p.visKm, 1).replace(/\.0$/, "");
+    w.ceil = p.ceilFt === Infinity ? "none" : String(p.ceilFt);
+    w.same = false;
+    WX_KEYS.forEach(function (key) {
+      $(key + "-" + icao).value = w[key];
+    });
+    $("same-" + icao).checked = false;
+    wx.filled[icao] = "Filled from the " + fromIcao + " METAR of " + utcTime(metar.time) + "." +
+      (p.wind && p.wind.variable && p.wind.kt > 0 ? " The wind is variable: enter the direction to plan with." : "");
+    changed();
+  }
+
+  function renderIppc() {
+    var codes = routeAerodromes().join(" ");
+    $("ippc-link").dataset.codes = codes;
+    if (!$("ippc-hint").dataset.copied) {
+      $("ippc-hint").textContent = "Copies " + codes + " to paste into IPPC's aerodrome briefing.";
+    }
+  }
+
+  function bindBriefing() {
+    $("wx-refresh").addEventListener("click", loadWeather);
+    $("briefing").addEventListener("click", function (e) {
+      var b = e.target.closest("button[data-fill]");
+      if (b) fillWeather(b.dataset.fill, b.dataset.from);
+    });
+    // Copy the route's codes, then let the link open IPPC as usual.
+    $("ippc-link").addEventListener("click", function () {
+      var codes = this.dataset.codes;
+      var hint = $("ippc-hint");
+      try {
+        navigator.clipboard.writeText(codes).then(function () {
+          hint.dataset.copied = "1";
+          hint.textContent = "Copied " + codes + ". Paste it into IPPC's aerodrome briefing.";
+        }, function () {
+          hint.textContent = "Type " + codes + " into IPPC's aerodrome briefing.";
+        });
+      } catch (err) {
+        hint.textContent = "Type " + codes + " into IPPC's aerodrome briefing.";
+      }
+    });
+  }
+
   function changed(keepExample) {
     if (!keepExample) state.example = false;
     save();
@@ -1133,6 +1298,8 @@
     renderChart(r);
     renderPerformance(r);
     renderDaylight(r);
+    renderBriefing();
+    renderIppc();
   }
 
   // ---------------------------------------------------------------- start
@@ -1144,7 +1311,9 @@
   fillSimpleInputs();
   bindSimpleInputs();
   renderSources();
+  bindBriefing();
   update();
+  loadWeather();
 
   var resizeTimer = null;
   window.addEventListener("resize", function () {
