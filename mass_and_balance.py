@@ -27,7 +27,8 @@ from aerodromes import AERODROMES, ALTERNATES, DEPARTURE, missing_data
 LB_PER_KG = 2.20462
 LITRES_PER_GAL = 3.78541
 FUEL_LB_PER_GAL = 6.0     # AVGAS, as used in the POH
-FINAL_RESERVE_MIN = 30    # VFR day final reserve; use 45 at night
+FINAL_RESERVE_MIN = 45    # OM C 2.1.3: final reserve, VFR day
+APPROACH_MIN = 10         # OM C 2.1.2-2.1.3: approach and landing, added to trip and alternate
 
 AIRCRAFT = {
     "OK-HAD": {
@@ -467,8 +468,8 @@ def main():
     fuel_arm = ac["fuel_arm"]
     fuel_lb = fuel * FUEL_LB_PER_GAL
     taxi_lb = ac["taxi_fuel_lb"]
-    trip_lb = trip_h * gph * FUEL_LB_PER_GAL
-    alt_lb = alt_h * gph * FUEL_LB_PER_GAL
+    trip_lb = (trip_h + APPROACH_MIN / 60) * gph * FUEL_LB_PER_GAL
+    alt_lb = (alt_h + APPROACH_MIN / 60) * gph * FUEL_LB_PER_GAL
 
     # Build the loading sheet line by line, keeping a running total.
     sheet = []        # (label, mass, arm, moment, is_subtotal)
@@ -496,9 +497,9 @@ def main():
     subtotal("Ramp mass", "Ramp", ac["max_ramp"])
     add("Taxi fuel", -taxi_lb, fuel_arm)
     subtotal("Take-off mass (TOM)", "TOM", ac["max_takeoff"])
-    add(f"Trip fuel {hhmm(trip_h)}", -trip_lb, fuel_arm)
+    add(f"Trip fuel {hhmm(trip_h)}+0:{APPROACH_MIN:02d}", -trip_lb, fuel_arm)
     subtotal("Landing mass (LM)", "LM", ac["max_landing"])
-    add(f"Fuel to {alt} {hhmm(alt_h)}", -alt_lb, fuel_arm)
+    add(f"Fuel to {alt} {hhmm(alt_h)}+0:{APPROACH_MIN:02d}", -alt_lb, fuel_arm)
     subtotal(f"Mass at {alt} (ALT)", "ALT", ac["max_landing"])
 
     print(f"\n{reg}  {ac['type']}  {DEPARTURE} - {dest or 'destination'}")

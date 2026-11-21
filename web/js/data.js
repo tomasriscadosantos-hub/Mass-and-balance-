@@ -43,6 +43,7 @@
       cgForward: [[1350, 31.0], [1670, 32.65]],
       cgAft: 36.5,
       envelopeMinLb: 1000, // bottom of the POH envelope chart
+      maxSoloHours: 3, // OM A: longest uninterrupted student solo flight
     },
     "OK-KUN": {
       type: "Cessna 172P",
@@ -77,6 +78,7 @@
       cgForward: [[1950, 35.0], [2400, 39.5]],
       cgAft: 47.3,
       envelopeMinLb: 1500,
+      maxSoloHours: 3.5,
     },
   };
 
@@ -94,27 +96,31 @@
    *            Portugal within about 1-2 degrees of true). null = designator x 10
    *   tora, toda, asda, lda   declared distances in metres (AIP AD 2.13)
    *   surface  "paved" or "grass"
+   *
+   * arp: aerodrome reference point as in the AIP, used for the distance to the
+   * alternate. Marked "check" where it isn't from the AIP yet.
    */
   var DEPARTURE = "LPPM";
+  // OM A: LPPM has a single runway; Faro (LPFR) is the briefed alternate.
   var ALTERNATES = ["LPFR", "LPEV"];
   var AERODROMES = {
     LPPM: {
       name: "Portimão",
-      nmFromDeparture: 0,
+      arp: ["37 08 58N", "008 35 02W"], // check against the AIP
       elevationFt: null,
       source: null,
       runways: [],
     },
     LPFR: {
       name: "Faro",
-      nmFromDeparture: 31, // straight line from LPPM
+      arp: ["37 00 53N", "007 57 56W"], // check against the AIP
       elevationFt: null,
       source: null,
       runways: [],
     },
     LPEV: {
       name: "Évora",
-      nmFromDeparture: 89,
+      arp: ["38 31 47N", "007 53 31W"], // AIP chart
       // AIP Portugal LPEV AD 2.24.01-1 aerodrome chart (12 AUG 2021, AIRAC
       // 003-21): ARP 38 31 47N 007 53 31W, elevation 246 m.
       elevationFt: 807,
@@ -127,6 +133,14 @@
         // RWY 07/25 (sand, 530 x 30 m) left out: no POH data for sand.
       ],
     },
+    // Beja: on the OM C training routes (LPPM-LPBJ-LPEV-LPPM, LPPM-LPBJ-LPFR-LPPM).
+    LPBJ: {
+      name: "Beja",
+      arp: ["38 04 44N", "007 55 55W"], // check against the AIP
+      elevationFt: null,
+      source: null,
+      runways: [],
+    },
   };
 
   MB.data = {
@@ -137,7 +151,8 @@
     LB_PER_KG: 2.20462,
     LITRES_PER_GAL: 3.78541,
     FUEL_LB_PER_GAL: 6.0, // AVGAS, as used in the POH
-    FINAL_RESERVE_MIN: 30, // VFR day final reserve; use 45 at night
+    FINAL_RESERVE_MIN: 45, // OM C 2.1.3: final reserve, VFR day
+    APPROACH_MIN: 10, // OM C 2.1.2-2.1.3: approach and landing, VFR, added to trip and alternate fuel
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = MB.data;

@@ -19,6 +19,22 @@ python3 -m http.server 8000      # then open http://localhost:8000
 It recalculates as you type, keeps your last inputs on the device, and once it has been served
 over http(s) and opened once it also works without signal.
 
+It follows the Flying Academy Operations Manual (Rev. 1, Sep 2024):
+
+| Rule | OM reference | What the app does |
+|---|---|---|
+| Fuel | C 2.1 | Minimum fuel = taxi + trip + alternate + 45 min final reserve. Trip and alternate each include 10 min for the approach and landing. It shows the breakdown and the extra fuel. |
+| Take-off | C 1.2 | 50 ft distance ×1.5 ≤ TORA, worked out at the maximum take-off mass |
+| Landing | C 1.4 | 50 ft distance ×1.5 ≤ LDA, worked out at the maximum landing mass |
+| Basic empty mass | C 3.2.1 | Includes unusable fuel and oil (the weighing protocols are corrected for this) |
+| Student solo (C152 with the instructor seat empty) | A 5.2.4, A 5.x | TORA at least 600 m, landing distance ×1.67 ≤ LDA, crosswind including gusts within the student's limit (50 % of the maximum demonstrated unless the instructor raised it, up to 100 %), at most 3 h in the C152 / 3.5 h in the C172 |
+| Crosswind with a student as PIC, gusts included | C 1.4 | Flags anything above the maximum demonstrated |
+
+The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
+LDA) is still there as an option. The alternate leg is measured from the destination, using the
+aerodrome reference points in `js/data.js`. LPPM, LPFR and LPBJ coordinates there still need
+checking against the AIP.
+
 On top of the terminal version it adds:
 
 - the CG moment envelope chart, like the one in POH section 6
@@ -38,8 +54,12 @@ Tests (Node 18 or newer):
 node --test "web/tests/*.test.js"
 ```
 
-The tests compare the results with the POH sample problem, the school's performance sheet and
-the Python version.
+The tests compare the results with:
+
+- the POH sample problem
+- the OM rules
+- the previous school's performance sheet
+- the Python version
 
 **Towards an app.** The `web` folder is already an installable web app: open it from a web
 address on the phone and use "Add to Home Screen". For the App Store or Google Play it can be
@@ -49,6 +69,10 @@ wrapped with Capacitor, which uses this folder as the app's content.
 Python files. Update both, or retire the Python version.
 
 ## Terminal version
+
+The original version. It uses the OM fuel rules (45 min reserve, 10 min approach allowances). Its
+runway checks still use the previous school's sheet, it has none of the student solo rules, and it
+measures the alternate leg from LPPM only. For planning by the OM, use the web app.
 
 | Aircraft | Type        |
 |----------|-------------|

@@ -2,12 +2,25 @@
  * Mass & balance and performance calculations (no page code in here).
  * Load after data.js and poh.js. Works in the browser and in Node.
  *
- * Performance checks follow the school's performance sheet (same factors as
- * EASA performance class B):
+ * Fuel (Flying Academy OM part C 2.1): trip and alternate fuel each include
+ * 10 min for approach and landing (VFR); final reserve 45 min (VFR day).
+ *
+ * Runway checks, rules "om" (default - Flying Academy OM part C 1.2 / 1.4,
+ * worked out at maximum take-off / landing mass):
+ *   take-off: 50 ft distance x1.5 <= TORA
+ *   landing:  50 ft distance x1.5 <= LDA
+ * plus, for a student solo flight (OM part A 5.2.4):
+ *   TORA at least 600 m, landing 50 ft distance x1.67 <= LDA, crosswind
+ *   (gusts included) within the student's limit - 50 % of the maximum
+ *   demonstrated unless the instructor has raised it (up to 100 %).
+ *
+ * Rules "classb" (the previous school's sheet, EASA performance class B
+ * factors, at the actual mass):
  *   take-off: ground roll <= TORA and 50 ft distance <= TODA, then
  *             with a clearway or stopway: 50 ft x1.15 <= TODA and x1.3 <= ASDA
  *             without:                    50 ft x1.25 <= TORA
  *   landing:  ground roll <= LDA and 50 ft distance <= 70 % of LDA
+ *
  * POH corrections: -10 % per 9 kt headwind, +10 % per 2 kt tailwind (up to
  * 10 kt); dry grass +15 % (take-off) / +45 % (landing) of the ground roll.
  */
@@ -23,6 +36,10 @@
     FT_PER_HPA: 27, // pressure altitude = elevation + (1013 - QNH) x 27 ft
     M_PER_FT: 0.3048,
     MAX_TAILWIND_KT: 10, // the POH corrections only go up to 10 kt
+    OM_FACTOR: 1.5, // OM C 1.2 / 1.4
+    SOLO_LDA_FACTOR: 1.67, // OM A 5.2.4 (1.92 on a contaminated runway)
+    SOLO_MIN_TORA_M: 600, // OM A 5.2.4
+    SOLO_XWIND_FRACTION: 0.5, // OM A 5.2.4: 50 % of the maximum demonstrated
     TODA_FACTOR: 1.15,
     ASDA_FACTOR: 1.3,
     TORA_FACTOR: 1.25,
@@ -48,6 +65,24 @@
     return Math.round(x * f) / f;
   }
 
+  // "38 31 47N" -> 38.5297
+  function parseDms(text) {
+    var m = /^(\d+)\s+(\d+)\s+(\d+(?:\.\d+)?)\s*([NSEW])$/.exec(String(text).trim());
+    if (!m) throw new Error("Can't read the coordinate " + text);
+    var deg = Number(m[1]) + Number(m[2]) / 60 + Number(m[3]) / 3600;
+    return m[4] === "S" || m[4] === "W" ? -deg : deg;
+  }
+
+  // Great-circle distance in NM between two aerodromes (their ARPs).
+  function distanceNm(a, b) {
+    var rad = Math.PI / 180;
+    var lat1 = parseDms(a.arp[0]) * rad, lon1 = parseDms(a.arp[1]) * rad;
+    var lat2 = parseDms(b.arp[0]) * rad, lon2 = parseDms(b.arp[1]) * rad;
+    var h = Math.pow(Math.sin((lat2 - lat1) / 2), 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon2 - lon1) / 2), 2);
+    return 2 * 3440.065 * Math.asin(Math.sqrt(h));
+  }
+
   // ------------------------------------------------------- mass and balance
 
   function basicEmpty(ac) {
@@ -68,9 +103,11 @@
   }
 
   /*
-   * input: { loads: [lb per station], fuelGal, tripH, altH, altLabel }
-   * Returns the loading sheet, the conditions (ZFM, Ramp, TOM, LM, ALT) with
-   * their CG limits, the fuel left at the alternate and a list of problems.
+   * input: { loads: [lb per station], fuelGal, tripH, altH, altLabel, solo }
+   * tripH and altH are flight times; the 10 min approach and landing
+   * allowance is added to each. Returns the loading sheet, the conditions
+   * (ZFM, Ramp, TOM, LM, ALT) with their CG limits, the fuel figures and a
+   * list of problems.
    */
   function massBalance(ac, input) {
     var D = MB.data;
@@ -92,9 +129,13 @@
     }
 
     var bew = basicEmpty(ac);
+    var lbPerHour = ac.fuelFlowGph * D.FUEL_LB_PER_GAL;
+    var approachH = D.APPROACH_MIN / 60;
     var fuelLb = input.fuelGal * D.FUEL_LB_PER_GAL;
-    var tripLb = input.tripH * ac.fuelFlowGph * D.FUEL_LB_PER_GAL;
-    var altLb = input.altH * ac.fuelFlowGph * D.FUEL_LB_PER_GAL;
+    var tripLb = (input.tripH + approachH) * lbPerHour;
+    var altLb = (input.altH + approachH) * lbPerHour;
+    var reserveLb = (D.FINAL_RESERVE_MIN / 60) * lbPerHour;
+    var plus = " + " + hhmm(approachH);
 
     add("Basic empty mass", bew.lb, bew.arm);
     ac.stations.forEach(function (st, i) {
@@ -106,9 +147,9 @@
     subtotal("Ramp mass", "Ramp", ac.maxRamp);
     add("Taxi fuel", -ac.taxiFuelLb, ac.fuelArm);
     subtotal("Take-off mass", "TOM", ac.maxTakeoff);
-    add("Trip fuel " + hhmm(input.tripH), -tripLb, ac.fuelArm);
+    add("Trip fuel " + hhmm(input.tripH) + plus, -tripLb, ac.fuelArm);
     subtotal("Landing mass", "LM", ac.maxLanding);
-    add("Fuel to " + input.altLabel + " " + hhmm(input.altH), -altLb, ac.fuelArm);
+    add("Fuel to " + input.altLabel + " " + hhmm(input.altH) + plus, -altLb, ac.fuelArm);
     subtotal("Mass at " + input.altLabel, "ALT", ac.maxLanding);
 
     conditions.forEach(function (c) {
@@ -144,13 +185,22 @@
         ac.usableFuelGal + " gal usable capacity");
     }
 
+    // OM C 2.1: taxi + trip + alternate + final reserve; the rest is extra.
+    var requiredLb = ac.taxiFuelLb + tripLb + altLb + reserveLb;
     var leftLb = fuelLb - ac.taxiFuelLb - tripLb - altLb;
-    var leftMin = (leftLb / (ac.fuelFlowGph * D.FUEL_LB_PER_GAL)) * 60;
-    if (leftLb < 0) {
-      problems.push("Fuel: not enough fuel for the trip and the alternate");
-    } else if (leftMin < D.FINAL_RESERVE_MIN) {
-      problems.push("Fuel: less than the " + D.FINAL_RESERVE_MIN +
-        " min final reserve left at " + input.altLabel);
+    var leftMin = (leftLb / lbPerHour) * 60;
+    var gal = function (lb) {
+      return lb / D.FUEL_LB_PER_GAL;
+    };
+    if (fuelLb < requiredLb - 1e-9) {
+      problems.push("Fuel: " + input.fuelGal.toFixed(1) + " gal on board, " +
+        gal(requiredLb).toFixed(1) + " gal required (taxi, trip, alternate and " +
+        D.FINAL_RESERVE_MIN + " min final reserve)");
+    }
+
+    if (input.solo && ac.maxSoloHours && input.tripH + approachH > ac.maxSoloHours + 1e-9) {
+      problems.push("Solo: " + hhmm(input.tripH + approachH) + " planned is over the " +
+        hhmm(ac.maxSoloHours) + " maximum for a student solo flight in the " + ac.type);
     }
 
     var byName = {};
@@ -162,7 +212,17 @@
       sheet: sheet,
       conditions: conditions,
       byName: byName,
-      fuel: { leftLb: leftLb, leftGal: leftLb / D.FUEL_LB_PER_GAL, leftMin: leftMin },
+      fuel: {
+        leftLb: leftLb,
+        leftGal: gal(leftLb),
+        leftMin: leftMin,
+        taxiGal: gal(ac.taxiFuelLb),
+        tripGal: gal(tripLb),
+        altGal: gal(altLb),
+        reserveGal: gal(reserveLb),
+        requiredGal: gal(requiredLb),
+        extraGal: gal(fuelLb - requiredLb),
+      },
       problems: problems,
     };
   }
@@ -322,11 +382,16 @@
   }
 
   /*
-   * Take-off or landing check on the runway in use, laid out like the
-   * school's performance sheet.
-   * site: { icao, elevationFt, rwy, weather: { qnh, oat, dir, kt } }
+   * Take-off or landing check on the runway in use.
+   * site: { icao, elevationFt, rwy, weather: { qnh, oat, dir, kt, gust } }
+   * opts: { rules: "om" | "classb", solo: bool, xwindLimitKt: number|null }
+   * With the OM rules the distances are worked out at the maximum take-off /
+   * landing mass, whatever mass is passed in.
    */
-  function runwayCheck(ac, kind, site, mass) {
+  function runwayCheck(ac, kind, site, mass, opts) {
+    opts = opts || {};
+    var rules = opts.rules === "classb" ? "classb" : "om";
+    var solo = !!opts.solo;
     var type = MB.poh.TYPES[ac.perf];
     var isTakeoff = kind === "take-off";
     var wx = site.weather;
@@ -335,15 +400,25 @@
     var wc = windComponents(runwayBearing(rwy), wx.dir, wx.kt);
     var head = wc[0];
     var cross = wc[1];
+    var gustCross = known(wx.gust) ? windComponents(runwayBearing(rwy), wx.dir, wx.gust)[1] : cross;
     var where = kind + " " + site.icao + " RWY " + rwy.rwy;
+    var massNote = null;
+    if (rules === "om") {
+      mass = isTakeoff ? ac.maxTakeoff : ac.maxLanding;
+      massNote = isTakeoff ? "MTOM" : "MLM";
+    }
     var result = {
       kind: kind,
+      rules: rules,
+      solo: solo,
       icao: site.icao,
       rwy: rwy,
       mass: mass,
+      massNote: massNote,
       weather: wx,
       head: head,
       cross: cross,
+      gustCross: gustCross,
       pa: pa,
       da: densityAltitude(pa, wx.oat),
       note: isTakeoff ? type.takeoffNote : type.landingNote,
@@ -395,7 +470,15 @@
       result.lines.push(line);
     }
 
-    if (isTakeoff) {
+    if (rules === "om") {
+      if (isTakeoff) {
+        check("50 ft ×" + C.OM_FACTOR, dist * C.OM_FACTOR, "TORA", rwy.tora);
+        if (solo) check("Solo: minimum TORA", C.SOLO_MIN_TORA_M, "TORA", rwy.tora);
+      } else {
+        check("50 ft ×" + C.OM_FACTOR, dist * C.OM_FACTOR, "LDA", rwy.lda);
+        if (solo) check("Solo: 50 ft ×" + C.SOLO_LDA_FACTOR, dist * C.SOLO_LDA_FACTOR, "LDA", rwy.lda);
+      }
+    } else if (isTakeoff) {
       check("Ground roll", run, "TORA", rwy.tora);
       check("50 ft clearance", dist, "TODA", rwy.toda);
       if (known(rwy.tora) && known(rwy.toda) && known(rwy.asda)) {
@@ -416,9 +499,17 @@
       result.warnings.push("tailwind " + (-head).toFixed(0) + " kt is more than the " +
         C.MAX_TAILWIND_KT + " kt the POH covers");
     }
-    if (cross > type.maxCrosswindKt) {
-      result.warnings.push("crosswind " + cross.toFixed(0) + " kt is above the " +
-        type.maxCrosswindKt + " kt maximum demonstrated");
+    // Crosswind including gusts (OM C 1.4 note, OM A 5.2.4).
+    var xwLimit = type.maxCrosswindKt;
+    var xwWhat = "the " + type.maxCrosswindKt + " kt maximum demonstrated";
+    if (solo) {
+      xwLimit = known(opts.xwindLimitKt) ? opts.xwindLimitKt : type.maxCrosswindKt * C.SOLO_XWIND_FRACTION;
+      xwWhat = "the student's " + xwLimit + " kt solo limit";
+    }
+    result.xwindLimitKt = xwLimit;
+    if (gustCross > xwLimit + 1e-9) {
+      result.warnings.push("crosswind " + gustCross.toFixed(0) + " kt" +
+        (known(wx.gust) ? " in the gusts" : "") + " is above " + xwWhat);
     }
     result.warnings.forEach(function (w) {
       result.problems.push(where + ": " + w);
@@ -473,6 +564,7 @@
     C: C,
     settings: settings,
     hhmm: hhmm,
+    distanceNm: distanceNm,
     basicEmpty: basicEmpty,
     forwardLimit: forwardLimit,
     massBalance: massBalance,

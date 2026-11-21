@@ -11,28 +11,34 @@
   var OTHER = "OTHER";
   var DEP = D.DEPARTURE;
 
+  var WX_KEYS = ["qnh", "oat", "dir", "kt", "gust"];
+
+  // Example: a navigation flight to Évora with Faro as the alternate.
   var EXAMPLE = {
     example: true,
     reg: "OK-KUN",
     wUnit: "kg",
     loads: ["75", "85", "", ""],
+    xwind: "",
     fUnit: "gal",
     fuel: "40.0",
     fuelFull: true,
-    dest: "LPPM",
+    dest: "LPEV",
     tripH: "1",
     tripM: "00",
-    alt: "LPEV",
+    alt: "LPFR",
     altH: "",
     altM: "",
-    wx: {
-      LPPM: { qnh: "1013", oat: "15", dir: "", kt: "", rwy: "auto", same: false },
-      LPFR: { qnh: "", oat: "", dir: "", kt: "", rwy: "auto", same: true },
-      LPEV: { qnh: "1015", oat: "30", dir: "310", kt: "8", rwy: "auto", same: true },
-    },
+    wx: {},
     obstacle: { on: false, nm: "", elev: "", limit: "", gs: "" },
+    rules: "om",
     method: "interp",
   };
+  Object.keys(D.AERODROMES).forEach(function (icao) {
+    EXAMPLE.wx[icao] = { qnh: "", oat: "", dir: "", kt: "", gust: "", rwy: "auto", same: true };
+  });
+  Object.assign(EXAMPLE.wx.LPPM, { qnh: "1013", oat: "18", same: false });
+  Object.assign(EXAMPLE.wx.LPEV, { qnh: "1015", oat: "30", dir: "310", kt: "8" });
 
   var state = load();
   var last = null; // last results, for redrawing the chart on resize
@@ -163,6 +169,15 @@
     });
   }
 
+  // The alternate leg starts at the destination (LPPM on a local flight).
+  // With "Other" as the destination the time has to be typed in.
+  function altFrom() {
+    return state.dest === OTHER ? null : state.dest;
+  }
+  function altTyped() {
+    return state.alt === OTHER || !altFrom();
+  }
+
   function buildRoute() {
     var ac = aircraft();
     var dest = Object.keys(D.AERODROMES).map(function (icao) {
@@ -174,16 +189,22 @@
     $("dest").innerHTML = dest.join("");
     $("dest").value = state.dest;
 
+    var from = altFrom();
     var alt = D.ALTERNATES.map(function (icao) {
       var ad = D.AERODROMES[icao];
-      return '<option value="' + icao + '">' + icao + " · " + esc(ad.name) + " · " +
-        ad.nmFromDeparture + " NM, " + calc.hhmm(ad.nmFromDeparture / ac.cruiseKt) + "</option>";
+      var leg = "";
+      if (from && from !== icao) {
+        var nm = calc.distanceNm(D.AERODROMES[from], ad);
+        leg = " · " + n(nm, 0) + " NM, " + calc.hhmm(nm / ac.cruiseKt);
+      }
+      return '<option value="' + icao + '">' + icao + " · " + esc(ad.name) + leg + "</option>";
     });
     alt.push('<option value="' + OTHER + '">Other (type the time)</option>');
     $("alt").innerHTML = alt.join("");
     $("alt").value = state.alt;
-    $("alt-hint").textContent = "Times from " + DEP + " at " + ac.cruiseKt + " kt, " +
-      ac.fuelFlowGph + " gal/h.";
+    $("alt-hint").textContent = from
+      ? "Straight line from " + from + " at " + ac.cruiseKt + " kt. Fuel adds 10 min for the approach and landing."
+      : "Type the flight time from your destination to the alternate.";
   }
 
   function wxField(icao, key, label, unit, mode, placeholder) {
@@ -224,6 +245,7 @@
         wxField(icao, "oat", "OAT", "°C", null) +
         wxField(icao, "dir", "Wind from", "°", "numeric", "calm") +
         wxField(icao, "kt", "Wind", "kt", "decimal", "0") +
+        wxField(icao, "gust", "Gust", "kt", "decimal", "none") +
         "</div>" +
         '<p class="error" id="err-wx-' + icao + '" hidden></p>' +
         '<div class="field"><label for="rwy-' + icao + '">Runway in use</label><select id="rwy-' + icao + '">' +
@@ -231,7 +253,7 @@
         '<div class="reports" id="reports-' + icao + '"></div>';
       box.appendChild(el);
 
-      ["qnh", "oat", "dir", "kt"].forEach(function (key) {
+      WX_KEYS.forEach(function (key) {
         var input = $(key + "-" + icao);
         input.value = state.wx[icao][key];
         input.addEventListener("input", function () {
@@ -271,6 +293,7 @@
   }
 
   function fillSimpleInputs() {
+    $("xwind").value = state.xwind;
     $("fuel").value = state.fuel;
     $("trip-h").value = state.tripH;
     $("trip-m").value = state.tripM;
@@ -298,6 +321,11 @@
     });
     $("dest").addEventListener("change", function (e) {
       state.dest = e.target.value;
+      buildRoute(); // alternate times are measured from the destination
+      changed();
+    });
+    $("xwind").addEventListener("input", function (e) {
+      state.xwind = e.target.value;
       changed();
     });
     $("alt").addEventListener("change", function (e) {
@@ -333,6 +361,7 @@
       $("fuel").value = state.fuel;
     });
     bindSeg("method-seg", "method");
+    bindSeg("rules-seg", "rules");
   }
 
   function rebuildAll() {
@@ -340,7 +369,7 @@
     buildRoute();
     fillSimpleInputs();
     Object.keys(D.AERODROMES).forEach(function (icao) {
-      ["qnh", "oat", "dir", "kt"].forEach(function (key) {
+      WX_KEYS.forEach(function (key) {
         $(key + "-" + icao).value = state.wx[icao][key];
       });
       $("same-" + icao).checked = !!state.wx[icao].same;
@@ -381,9 +410,13 @@
     } else if (isNaN(dir) || dir < 0 || dir > 360) {
       bad.push(["dir", "wind direction (0 to 360°)"]);
     }
+    var gust = parse(w.gust);
+    if (gust !== null && (isNaN(gust) || gust < kt || gust > 80)) {
+      bad.push(["gust", "gust (at least the wind speed)"]);
+    }
     fieldErrors[icao] = bad;
     if (bad.length) return null;
-    return { qnh: qnh, oat: oat, dir: dir, kt: kt };
+    return { qnh: qnh, oat: oat, dir: dir, kt: kt, gust: gust };
   }
 
   function compute() {
@@ -416,15 +449,32 @@
 
     var altIcao = state.alt === OTHER ? null : state.alt;
     var altH;
-    if (altIcao) {
-      altH = D.AERODROMES[altIcao].nmFromDeparture / ac.cruiseKt;
+    if (altIcao && altIcao === state.dest) {
+      errors.alt = "Choose an alternate other than the destination.";
+    } else if (!altTyped()) {
+      altH = calc.distanceNm(D.AERODROMES[altFrom()], D.AERODROMES[altIcao]) / ac.cruiseKt;
     } else {
       altH = readTime(state.altH, state.altM);
       if (altH === null) errors.alt = "Enter the flight time to the alternate.";
       else if (isNaN(altH)) errors.alt = "Enter hours and minutes as numbers.";
     }
 
-    var result = { ac: ac, errors: errors, problems: [], notices: [], perf: null, mb: null };
+    // Solo: the instructor seat can be left empty (C152 only).
+    var solo = ac.stations.some(function (st, i) {
+      return st.empty === "solo" && !loads[i] && !errors["load-" + i];
+    });
+    var demo = MB.poh.TYPES[ac.perf].maxCrosswindKt;
+    var xwindLimit = null;
+    if (solo) {
+      var xw = parse(state.xwind);
+      if (xw === null) xwindLimit = demo * calc.C.SOLO_XWIND_FRACTION;
+      else if (isNaN(xw) || xw <= 0 || xw > demo) {
+        errors.xwind = "Enter a limit up to " + demo + " kt (100 % of the maximum demonstrated).";
+      } else xwindLimit = xw;
+    }
+
+    var result = { ac: ac, errors: errors, problems: [], notices: [], perf: null, mb: null,
+      solo: solo, demoXwind: demo };
     if (Object.keys(errors).length) return result;
 
     result.mb = calc.massBalance(ac, {
@@ -433,15 +483,17 @@
       tripH: tripH,
       altH: altH,
       altLabel: altIcao || "alternate",
+      solo: solo,
     });
     result.problems = result.mb.problems.slice();
-    result.perf = performance(ac, result.mb, altIcao);
+    result.perf = performance(ac, result.mb, altIcao,
+      { rules: state.rules, solo: solo, xwindLimitKt: xwindLimit });
     result.problems = result.problems.concat(result.perf.problems);
     result.notices = result.perf.notices;
     return result;
   }
 
-  function performance(ac, mb, altIcao) {
+  function performance(ac, mb, altIcao, opts) {
     var dest = state.dest === OTHER ? null : state.dest;
     var involved = [];
     [DEP, dest, altIcao].forEach(function (icao) {
@@ -488,12 +540,12 @@
     [
       ["take-off", DEP, m.TOM.lb, "Take-off"],
       ["landing", dest, m.LM.lb, "Landing"],
-      ["take-off", altIcao, m.TOM.lb, "Take-off at the alternate (take-off mass, as if refuelled)"],
+      ["take-off", altIcao, m.TOM.lb, "Take-off at the alternate"],
       ["landing", altIcao, m.ALT.lb, "Landing at the alternate"],
     ].forEach(function (ev) {
       var card = ev[1] && out.cards[ev[1]];
       if (!card || !card.site) return;
-      var r = calc.runwayCheck(ac, ev[0], card.site, ev[2]);
+      var r = calc.runwayCheck(ac, ev[0], card.site, ev[2], opts);
       r.title = ev[3];
       card.reports.push(r);
       out.problems = out.problems.concat(r.problems);
@@ -545,10 +597,23 @@
       setError("load-" + i, msg);
       $("load-" + i).setAttribute("aria-invalid", String(!!msg));
     });
-    ["fuel", "trip", "alt"].forEach(function (k) {
+    ["fuel", "trip", "alt", "xwind"].forEach(function (k) {
       setError(k, r.errors[k]);
     });
     $("fuel").setAttribute("aria-invalid", String(!!r.errors.fuel));
+    $("xwind").setAttribute("aria-invalid", String(!!r.errors.xwind));
+    $("alt").setAttribute("aria-invalid", String(!!r.errors.alt && !altTyped()));
+
+    // Solo box: shown while the instructor seat is empty.
+    var ac = r.ac;
+    $("solo-box").hidden = !r.solo;
+    if (r.solo) {
+      var half = r.demoXwind * calc.C.SOLO_XWIND_FRACTION;
+      $("xwind").placeholder = n(half, 1).replace(/\.0$/, "");
+      $("xwind-hint").textContent = "Empty = " + n(half, 1).replace(/\.0$/, "") + " kt, 50 % of the " +
+        r.demoXwind + " kt maximum demonstrated. Your instructor can raise it up to " + r.demoXwind + " kt.";
+      $("solo-hours").textContent = calc.hhmm(ac.maxSoloHours);
+    }
     ["trip-h", "trip-m"].forEach(function (id) {
       $(id).setAttribute("aria-invalid", String(!!r.errors.trip));
     });
@@ -597,13 +662,15 @@
 
     var mb = r.mb;
     var tom = mb.byName.TOM;
-    var altLabel = state.alt === OTHER ? "alternate" : state.alt;
-    box.innerHTML = '<div class="verdict">' + title + "</div>" +
+    var f = mb.fuel;
+    box.innerHTML = '<div class="verdict">' + title + (r.solo ? '<span class="chip chip-warn">Solo limits</span>' : "") +
+      "</div>" +
       (items.length ? '<ul class="issues">' + items.join("") + "</ul>" : "") +
       '<div class="figures">' +
       figure("Take-off mass", n(tom.lb, 1) + " lb", n(tom.lb / D.LB_PER_KG, 0) + " kg · max " + r.ac.maxTakeoff) +
       figure("CG at take-off", n(tom.cg, 2) + " in", n(tom.fwd, 2) + " – " + n(tom.aft, 2) + " in") +
-      figure("Fuel at " + altLabel, n(mb.fuel.leftGal, 1) + " gal", "about " + n(Math.max(mb.fuel.leftMin, 0), 0) + " min") +
+      figure("Minimum fuel", n(f.requiredGal, 1) + " gal", "on board " + n(f.requiredGal + f.extraGal, 1) +
+        " · extra " + n(f.extraGal, 1)) +
       "</div>";
   }
   function figure(k, v, s) {
@@ -653,9 +720,11 @@
       }).join("") + "</tbody>";
     var f = r.mb.fuel;
     var altLabel = state.alt === OTHER ? "the alternate" : state.alt;
-    $("fuel-left").textContent = "Fuel left at " + altLabel + ": " + n(f.leftGal, 1) + " gal (" + n(f.leftLb, 0) +
-      " lb), about " + n(f.leftMin, 0) + " min at " + r.ac.fuelFlowGph + " gal/h. Final reserve: " +
-      D.FINAL_RESERVE_MIN + " min (VFR day).";
+    $("fuel-left").textContent = "Minimum fuel " + n(f.requiredGal, 1) + " gal = taxi " + n(f.taxiGal, 1) +
+      " + trip " + n(f.tripGal, 1) + " + alternate " + n(f.altGal, 1) + " + final reserve " +
+      n(f.reserveGal, 1) + " (" + D.FINAL_RESERVE_MIN + " min at " + r.ac.fuelFlowGph + " gal/h). On board " +
+      n(f.requiredGal + f.extraGal, 1) + " gal, extra " + n(f.extraGal, 1) + " gal. Left at " + altLabel + ": " +
+      n(f.leftGal, 1) + " gal, about " + n(f.leftMin, 0) + " min.";
   }
 
   // CG moment envelope: moment/1000 across, mass up, like POH section 6.
@@ -760,10 +829,13 @@
     else if (r.unchecked) head = '<span class="chip chip-warn">Runway not checked</span>';
     else head = '<span class="chip chip-ok">OK</span>';
     var wx = r.weather;
-    var wind = wx.kt ? pad(wx.dir, 3) + "/" + pad(wx.kt, 2) : "calm";
-    var facts = "RWY " + esc(r.rwy.rwy) + " · " + n(r.mass, 0) + " lb · wind " + wind + " → " +
+    var gust = wx.gust !== null && wx.gust !== undefined;
+    var wind = wx.kt ? pad(wx.dir, 3) + "/" + pad(wx.kt, 2) + (gust ? "G" + pad(wx.gust, 2) : "") : "calm";
+    var mass = n(r.mass, 0) + " lb" + (r.massNote ? " (" + r.massNote + ", as the OM requires)" : "");
+    var facts = "RWY " + esc(r.rwy.rwy) + " · " + mass + " · wind " + wind + " → " +
       (r.head >= 0 ? "headwind " : "tailwind ") + n(Math.abs(r.head), 0) + " kt, crosswind " + n(r.cross, 0) +
-      " kt · OAT " + n(wx.oat, 0) + " °C · QNH " + n(wx.qnh, 0) + " · PA " + n(r.pa, 0) + " ft · DA " +
+      " kt" + (gust ? " (" + n(r.gustCross, 0) + " in gusts)" : "") +
+      " · OAT " + n(wx.oat, 0) + " °C · QNH " + n(wx.qnh, 0) + " · PA " + n(r.pa, 0) + " ft · DA " +
       n(r.da, 0) + " ft";
     var html = '<div class="report"><div class="report-head"><span class="report-title">' + esc(r.title) +
       "</span>" + head + '</div><p class="facts">' + facts + "</p>";
@@ -778,11 +850,11 @@
     html += '<div class="table-scroll"><table class="data"><tbody>' + r.lines.map(function (l) {
       var avail = l.available === null || l.available === undefined ? "–" : n(l.available, 0) + " m";
       var chip = l.ok === null ? '<span class="chip chip-warn">no data</span>' :
-        l.ok ? '<span class="chip chip-ok">OK</span>' : '<span class="chip chip-bad">Too long</span>';
+        l.ok ? '<span class="chip chip-ok">OK</span>' : '<span class="chip chip-bad">Not OK</span>';
       return "<tr><td>" + esc(l.label) + "</td><td>" + n(l.need, 0) + " m</td><td>" + (l.ok === false ? "&gt;" : "&lt;") +
         "</td><td>" + esc(l.name) + " " + avail + '</td><td class="status">' + chip + "</td></tr>";
     }).join("") + "</tbody></table></div>";
-    if (isTakeoff && r.unchecked && r.lines.length === 2) {
+    if (r.rules === "classb" && isTakeoff && r.unchecked && r.lines.length === 2) {
       html += '<p class="hint">The ×1.15 / ×1.3 or ×1.25 checks need TORA, TODA and ASDA.</p>';
     }
     r.warnings.forEach(function (w) {
@@ -835,7 +907,7 @@
       var sharing = canShare && state.wx[icao].same;
       $("wx-" + icao).hidden = sharing;
       var bad = (perf.fieldErrors[icao] || []);
-      ["qnh", "oat", "dir", "kt"].forEach(function (key) {
+      WX_KEYS.forEach(function (key) {
         $(key + "-" + icao).setAttribute("aria-invalid", String(bad.some(function (b) { return b[0] === key; })));
       });
       setError("wx-" + icao, !sharing && bad.length ? "Enter the " + bad.map(function (b) { return b[1]; }).join(", ") + "." : "");
@@ -857,12 +929,13 @@
     paintSeg("wunit-seg", state.wUnit);
     paintSeg("funit-seg", state.fUnit);
     paintSeg("method-seg", state.method);
+    paintSeg("rules-seg", state.rules);
     $("brand-ac").textContent = state.reg + " " + ac.type.replace("Cessna ", "C");
     $("fuel-unit").textContent = state.fUnit === "l" ? "L" : "gal";
     var fullGal = ac.usableFuelGal;
     $("fuel-hint").textContent = "Full: " + n(fullGal, 1) + " gal (" + n(fullGal * D.LITRES_PER_GAL, 1) +
       " L) usable, " + n(fullGal * D.FUEL_LB_PER_GAL, 0) + " lb.";
-    $("alt-time-field").hidden = state.alt !== OTHER;
+    $("alt-time-field").hidden = !altTyped();
     $("example-note").hidden = !state.example;
   }
 
@@ -874,7 +947,8 @@
       var ad = D.AERODROMES[icao];
       parts.push(icao + ": " + (ad.source || "no AIP data yet"));
     });
-    $("sources").textContent = "POH: C152 (1980 model) and C172P (1980, rev. 2). " + parts.join(" · ") + ".";
+    $("sources").textContent = "Flying Academy Operations Manual Rev. 1 (Sep 2024). POH: C152 (1980 model) and " +
+      "C172P (1980, rev. 2). " + parts.join(" · ") + ".";
   }
 
   function changed(keepExample) {
