@@ -109,14 +109,14 @@
       // NAV Portugal sunrise/sunset tables 2026: 37 08 58N 008 35 02W, elevation 1.47 m.
       arp: ["37 08 58N", "008 35 02W"],
       elevationFt: 5,
-      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); IPMA station 878 (runway numbers)",
+      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); IPMA station 878 (runway numbers); school (paved)",
       // IPMA automatic weather station at the aerodrome (wind in kt, every 10 min).
       ipma: { station: 878, page: "https://ema.ipma.pt/afis/portimao-aerodromo/" },
       runways: [
-        // RWY 11/29 as the IPMA station gives them; heading = designator x 10
-        // until the AIP is in. Surface and declared distances still to add.
-        { rwy: "11", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
-        { rwy: "29", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+        // RWY 11/29 as the IPMA station gives them, paved; heading = designator
+        // x 10 until the AIP is in. Declared distances still to add.
+        { rwy: "11", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
+        { rwy: "29", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
       ],
     },
     LPFR: {

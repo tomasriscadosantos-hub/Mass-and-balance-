@@ -1,6 +1,6 @@
 // Offline support: keeps a copy of the app so it opens without signal at the
 // airfield. Bump VERSION whenever any file below changes.
-const VERSION = "mb-lppm-6";
+const VERSION = "mb-lppm-7";
 const FILES = [
   "./",
   "index.html",

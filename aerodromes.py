@@ -27,7 +27,13 @@ AERODROMES = {
         "nm_from_departure": 0,
         "elevation_ft": 5,       # 1.47 m, NAV Portugal sunrise/sunset tables 2026
         "runways": [
-            # {"rwy": "..", "bearing": None, "tora": ..., "toda": ..., "asda": ..., "lda": ..., "surface": "paved"},
+            # RWY 11/29, paved (runway numbers from the IPMA station at the
+            # aerodrome). Heading = designator x 10 until the AIP is in.
+            # Declared distances: AIP AD 2.13, still to add.
+            {"rwy": "11", "bearing": None, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": "paved"},
+            {"rwy": "29", "bearing": None, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": "paved"},
         ],
     },
     "LPFR": {

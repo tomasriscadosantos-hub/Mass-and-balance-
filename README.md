@@ -206,7 +206,7 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    Oil quantities:
    - OK-HAD: 6 qt (no oil filter).
    - OK-KUN: 8 qt, full oil, as the OM defines the basic empty mass.
-2. **Aerodrome data.** LPPM's runway numbers (11/29) come from its IPMA station; its surface and
+2. **Aerodrome data.** LPPM's runway is 11/29 (numbers from its IPMA station), paved; its
    declared distances are still missing. In the web app the data is in `web/js/data.js`.
    Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
