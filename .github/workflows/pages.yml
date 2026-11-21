@@ -50,7 +50,7 @@ jobs:
         run: |
           cp -r web _site
           rm -rf _site/tests _site/weather.json
-      - name: Download METARs and TAFs
+      - name: Download METARs, TAFs and IPMA station data
         run: node .github/scripts/fetch-weather.js _site/weather.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
