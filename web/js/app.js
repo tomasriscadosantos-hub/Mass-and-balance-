@@ -1120,11 +1120,18 @@
 
   // ------------------------------------------------- weather and NOTAMs
 
-  var wx = { data: null, error: "", loading: false, filled: {} };
+  var wx = { data: null, error: "", status: "", loading: false, filled: {} };
 
-  // weather.json is published with the app by the deploy workflow (every ~15 min).
-  function loadWeather() {
+  // weather.json is published with the app by the deploy workflow (normally
+  // every 15 min). manual: the Refresh button, which says what it found.
+  function loadWeather(manual) {
+    if (wx.loading) return;
+    var before = wx.data && wx.data.fetched;
     wx.loading = true;
+    wx.status = "";
+    var btn = $("wx-refresh");
+    btn.disabled = true;
+    btn.textContent = "Checking…";
     renderBriefing();
     fetch("weather.json?t=" + Date.now(), { cache: "no-store" })
       .then(function (res) {
@@ -1135,12 +1142,20 @@
         wx.data = data;
         var errors = data.errors || (data.error ? [data.error] : []);
         wx.error = errors.length ? "Part of the weather didn't download at the last update; what's missing is not shown." : "";
+        if (manual) {
+          wx.status = data.fetched === before
+            ? "Nothing newer on the server yet. For the wind right now, use Live wind on IPMA."
+            : "Updated.";
+        }
       })
       .catch(function () {
-        wx.error = "No weather here. It needs signal and the installed app (not the preview).";
+        if (wx.data) wx.status = "Couldn't check for newer weather. Is there signal?";
+        else wx.error = "No weather here. It needs signal and the installed app (not the preview).";
       })
       .then(function () {
         wx.loading = false;
+        btn.disabled = false;
+        btn.textContent = "Refresh";
         renderBriefing();
       });
   }
@@ -1193,7 +1208,13 @@
       box.innerHTML = '<p class="missing">' + esc(wx.error) + "</p>";
       return;
     }
-    var html = wx.error ? '<p class="missing">' + esc(wx.error) + "</p>" : "";
+    var html = "";
+    if (wx.data.fetched) {
+      html += '<div class="wx-updated"><span>Weather downloaded for the app</span>' +
+        ageChip(wx.data.fetched, 30) + "</div>";
+    }
+    if (wx.status) html += '<p class="hint wx-status" role="status">' + esc(wx.status) + "</p>";
+    if (wx.error) html += '<p class="missing">' + esc(wx.error) + "</p>";
     routeAerodromes().forEach(function (icao) {
       var ad = D.AERODROMES[icao];
       var station = reportFor(wx.data.stations, icao); // IPMA station at the aerodrome
@@ -1255,8 +1276,8 @@
     box.innerHTML = html;
   }
 
-  function ageChip(iso) {
-    var old = (Date.now() - Date.parse(iso)) / 60000 > 60;
+  function ageChip(iso, oldAfterMin) {
+    var old = (Date.now() - Date.parse(iso)) / 60000 > (oldAfterMin || 60);
     return '<span class="chip ' + (old ? "chip-warn" : "chip-ok") + '">' + esc(utcTime(iso)) + ", " +
       esc(ageText(iso)) + "</span>";
   }
@@ -1314,7 +1335,13 @@
   }
 
   function bindBriefing() {
-    $("wx-refresh").addEventListener("click", loadWeather);
+    $("wx-refresh").addEventListener("click", function () {
+      loadWeather(true);
+    });
+    // Coming back to the app: fetch the latest copy without a message.
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") loadWeather(false);
+    });
     $("briefing").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-fill]");
       if (b) fillWeather(b.dataset.fill, b.dataset.from, b.dataset.only);

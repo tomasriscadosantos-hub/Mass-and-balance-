@@ -11,6 +11,17 @@
 
   var CHANGES = [
     {
+      id: 3,
+      date: "2026-11-21",
+      items: [
+        {
+          title: "How old is the weather?",
+          text: "The weather panel shows when the app last downloaded it. Refresh says whether anything " +
+            "newer has arrived, and opening the app fetches the latest by itself.",
+        },
+      ],
+    },
+    {
       id: 2,
       date: "2026-11-21",
       items: [
