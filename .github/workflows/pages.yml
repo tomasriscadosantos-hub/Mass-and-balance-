@@ -38,6 +38,7 @@ jobs:
     needs: test
     if: ${{ !cancelled() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # so a hung download can't hold up the next refresh
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -19,39 +19,55 @@ const ids = Object.keys(data.AERODROMES).join(",");
 const AWC = "https://aviationweather.gov/api/data/";
 const HEADERS = { "User-Agent": "mass-and-balance-web-app" };
 
-// One retry after a short pause: the services sometimes answer 5xx for a moment.
-async function fetchRetry(url) {
-  const res = await fetch(url, { headers: HEADERS });
-  if (res.status < 500) return res;
+// Each attempt (answer and body) may take at most 20 s, so a service that
+// hangs leaves its part out instead of holding up the deploy.
+async function get(url) {
+  const signal = AbortSignal.timeout(20000);
+  const res = await fetch(url, { headers: HEADERS, signal });
+  return { status: res.status, ok: res.ok, text: await res.text() };
+}
+
+// One retry after a short pause: the services sometimes answer 5xx or time out.
+async function getRetry(url) {
+  try {
+    const res = await get(url);
+    if (res.status < 500) return res;
+  } catch (e) {
+    // retried below
+  }
   await new Promise((r) => setTimeout(r, 4000));
-  return fetch(url, { headers: HEADERS });
+  return get(url);
 }
 
 async function awc(kind, extra) {
-  const res = await fetchRetry(`${AWC}${kind}?ids=${ids}&format=json${extra}`);
+  const res = await getRetry(`${AWC}${kind}?ids=${ids}&format=json${extra}`);
   if (!res.ok && res.status !== 204) throw new Error(`${kind}: HTTP ${res.status}`);
-  const text = await res.text();
-  return text.trim() ? JSON.parse(text) : [];
+  return res.text.trim() ? JSON.parse(res.text) : [];
 }
 
 async function ipma(icao, station) {
-  const res = await fetchRetry(`https://ema.ipma.pt/wp-content/data/data${station}.csv`);
+  const res = await getRetry(`https://ema.ipma.pt/wp-content/data/data${station}.csv`);
   if (!res.ok) throw new Error(`IPMA ${station}: HTTP ${res.status}`);
-  const latest = calc.parseIpmaCsv(await res.text());
+  const latest = calc.parseIpmaCsv(res.text);
   return latest && Object.assign({ icao }, latest);
 }
 
 (async () => {
   const out = { fetched: new Date().toISOString(), metars: [], tafs: [], stations: [], errors: [] };
+  const note = (e) => out.errors.push(String((e && e.message) || e));
   try {
     const newest = {};
     for (const m of await awc("metar", "&hours=3")) {
       if (!newest[m.icaoId] || m.obsTime > newest[m.icaoId].obsTime) newest[m.icaoId] = m;
     }
     out.metars = Object.values(newest).map((m) => ({ icao: m.icaoId, time: m.reportTime, raw: m.rawOb }));
+  } catch (e) {
+    note(e);
+  }
+  try {
     out.tafs = (await awc("taf", "")).map((t) => ({ icao: t.icaoId, issued: t.issueTime, raw: t.rawTAF }));
   } catch (e) {
-    out.errors.push(String((e && e.message) || e));
+    note(e);
   }
   for (const [icao, ad] of Object.entries(data.AERODROMES)) {
     if (!ad.ipma) continue;
@@ -59,7 +75,7 @@ async function ipma(icao, station) {
       const s = await ipma(icao, ad.ipma.station);
       if (s) out.stations.push(s);
     } catch (e) {
-      out.errors.push(String((e && e.message) || e));
+      note(e);
     }
   }
   fs.writeFileSync(process.argv[2], JSON.stringify(out, null, 1));
