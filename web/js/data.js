@@ -109,8 +109,15 @@
       // NAV Portugal sunrise/sunset tables 2026: 37 08 58N 008 35 02W, elevation 1.47 m.
       arp: ["37 08 58N", "008 35 02W"],
       elevationFt: 5,
-      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); runways still to add",
-      runways: [],
+      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); IPMA station 878 (runway numbers)",
+      // IPMA automatic weather station at the aerodrome (wind in kt, every 10 min).
+      ipma: { station: 878, page: "https://ema.ipma.pt/afis/portimao-aerodromo/" },
+      runways: [
+        // RWY 11/29 as the IPMA station gives them; heading = designator x 10
+        // until the AIP is in. Surface and declared distances still to add.
+        { rwy: "11", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+        { rwy: "29", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+      ],
     },
     LPFR: {
       name: "Faro",
@@ -126,6 +133,7 @@
       // 003-21): ARP 38 31 47N 007 53 31W, elevation 246 m.
       elevationFt: 807,
       source: "AIP LPEV AD 2.24.01-1 (AIRAC 003-21)",
+      ipma: { station: 843, page: "https://ema.ipma.pt/afis/evora-aerodromo/" },
       runways: [
         // RWY 01/19: asphalt 1300 x 23 m, displaced threshold at both ends.
         // Declared distances: AIP AD 2.13 (not on the chart).

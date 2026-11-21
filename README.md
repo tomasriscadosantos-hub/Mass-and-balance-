@@ -81,15 +81,20 @@ Then open the address on the phone:
 Once opened, it also works without signal. After an update it loads the new version the next
 time it's opened with signal.
 
-**Weather and NOTAMs.** The deploy workflow also runs every 30 minutes. It downloads the latest
-METARs and TAFs for the app's aerodromes from aviationweather.gov and publishes them with the app
-as `weather.json`, because the weather service doesn't let web pages on other sites read it
-directly. In the app, the Weather and NOTAMs panel shows each report with its age:
+**Weather and NOTAMs.** The deploy workflow also runs every 15 minutes. It downloads the latest
+METARs and TAFs for the app's aerodromes from aviationweather.gov, and the latest readings of the
+IPMA automatic stations at LPPM (station 878) and LPEV (station 843) from ema.ipma.pt. It publishes
+them with the app as `weather.json`, because these services don't let web pages on other sites read
+them directly. In the app, the Weather and NOTAMs panel shows each report with its age:
 
-- **Fill:** puts a METAR's values (QNH, OAT, wind and gusts, visibility, ceiling) into that
-  aerodrome's weather fields.
-- **Nearest report:** LPPM and LPEV publish no METAR, so the panel offers the nearest one (LPFR,
-  LPBJ) as a guide.
+- **IPMA station (LPPM, LPEV):** the 10-minute mean wind, the 10-minute maximum, QNH and
+  temperature. **Fill** puts them into that aerodrome's weather fields (the maximum goes in Gust).
+  **Live wind on IPMA** opens the station's page, which is newer than the app's copy (up to about
+  25 minutes old). The stations measure no visibility or cloud.
+- **Nearest METAR:** LPPM and LPEV publish no METAR, so the panel shows the nearest one (LPFR,
+  LPBJ) and offers only its visibility and ceiling, as a guide.
+- **Fill (LPFR, LPBJ):** puts the METAR's values (QNH, OAT, wind and gusts, visibility, ceiling)
+  into that aerodrome's weather fields.
 - **NOTAMs in IPPC:** copies the route's ICAO codes and opens IPPC (ippc.no) to paste them into the
   aerodrome briefing. IPPC has no data service the app could read NOTAMs from.
 
@@ -201,7 +206,9 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    Oil quantities:
    - OK-HAD: 6 qt (no oil filter).
    - OK-KUN: 8 qt, full oil, as the OM defines the basic empty mass.
-2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
+2. **Aerodrome data.** LPPM's runway numbers (11/29) come from its IPMA station; its surface and
+   declared distances are still missing. In the web app the data is in `web/js/data.js`.
+   Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are
    skipped. Check the data again every AIRAC cycle.

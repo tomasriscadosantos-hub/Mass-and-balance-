@@ -380,6 +380,7 @@ table.data tr.minus td { color: var(--muted); }
 .wx-raw { margin: 0; font: 400 0.8rem/1.45 var(--font-data); white-space: pre-wrap; overflow-wrap: anywhere; }
 .wx-report details summary { cursor: pointer; font-size: var(--step--1); color: var(--muted); min-height: 28px; display: flex; align-items: center; }
 .wx-report .btn-ghost { justify-self: start; min-height: 40px; }
+.wx-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 .notams { display: grid; gap: 6px; justify-items: start; }
 a.btn-ghost { display: inline-flex; align-items: center; text-decoration: none; }
 

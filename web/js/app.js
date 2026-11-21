@@ -669,10 +669,12 @@
       r.title = ev[3];
       card.reports.push(r);
       out.problems = out.problems.concat(r.problems);
-      if (r.notes.length && !card.notesNoted) {
-        card.notesNoted = true;
-        out.notices.push(ev[1] + ": " + r.notes[0]);
-      }
+      card.notesNoted = card.notesNoted || {};
+      r.notes.forEach(function (note) {
+        if (card.notesNoted[note]) return;
+        card.notesNoted[note] = true;
+        out.notices.push(ev[1] + ": " + note);
+      });
       if (r.unchecked && !card.uncheckedNoted) {
         card.uncheckedNoted = true;
         out.notices.push(ev[1] + (card.noRunways
@@ -1120,7 +1122,7 @@
 
   var wx = { data: null, error: "", loading: false, filled: {} };
 
-  // weather.json is published with the app by the deploy workflow (every ~30 min).
+  // weather.json is published with the app by the deploy workflow (every ~15 min).
   function loadWeather() {
     wx.loading = true;
     renderBriefing();
@@ -1131,7 +1133,8 @@
       })
       .then(function (data) {
         wx.data = data;
-        wx.error = data.error ? "The weather service didn't answer at the last update." : "";
+        var errors = data.errors || (data.error ? [data.error] : []);
+        wx.error = errors.length ? "Part of the weather didn't download at the last update; what's missing is not shown." : "";
       })
       .catch(function () {
         wx.error = "No weather here. It needs signal and the installed app (not the preview).";
@@ -1192,61 +1195,113 @@
     }
     var html = wx.error ? '<p class="missing">' + esc(wx.error) + "</p>" : "";
     routeAerodromes().forEach(function (icao) {
+      var ad = D.AERODROMES[icao];
+      var station = reportFor(wx.data.stations, icao); // IPMA station at the aerodrome
       var own = reportFor(wx.data.metars, icao);
       var near = own ? null : nearestMetar(icao);
       var metar = own || (near && near.metar);
       var taf = reportFor(wx.data.tafs, metar ? metar.icao : icao);
+      var shown = station || metar;
       html += '<div class="wx-report"><div class="wx-report-head"><span class="wx-report-title">' + icao + " · " +
-        esc(D.AERODROMES[icao].name) + "</span>";
-      if (metar) {
-        var old = (Date.now() - Date.parse(metar.time)) / 60000 > 60;
-        html += '<span class="chip ' + (old ? "chip-warn" : "chip-ok") + '">' + esc(utcTime(metar.time)) + ", " +
-          esc(ageText(metar.time)) + "</span>";
-      }
+        esc(ad.name) + "</span>";
+      if (shown) html += ageChip(shown.time);
       html += "</div>";
+
+      if (station) {
+        var parts = [];
+        if (station.qnh !== null) parts.push("QNH " + station.qnh);
+        if (station.tempC !== null) parts.push(n(station.tempC, 1) + " °C");
+        html += "<p>IPMA station at the aerodrome: wind <strong>" +
+          (station.kt === 0 ? "calm" : pad(station.dir, 3) + "° " + station.kt + " kt") + "</strong>" +
+          (station.maxKt !== null && station.maxKt > station.kt ? ", max " + station.maxKt + " kt" : "") +
+          " (10-min mean)" + (parts.length ? ", " + parts.join(", ") : "") + ".</p>";
+        html += '<div class="wx-buttons"><button type="button" class="btn-ghost" data-fill="' + icao +
+          '" data-from="ipma">Fill ' + icao + " weather</button>" +
+          '<a class="btn-ghost" href="' + esc(ad.ipma.page) + '" target="_blank" rel="noopener">Live wind on IPMA</a></div>';
+        html += '<p class="hint">The station measures no visibility or cloud: ask the AFIS' +
+          (metar ? ", or see the " + metar.icao + " METAR below." : ".") + "</p>";
+      } else if (ad.ipma) {
+        html += '<p>No recent data from the IPMA station. <a href="' + esc(ad.ipma.page) +
+          '" target="_blank" rel="noopener">Live wind on IPMA</a></p>';
+      }
+
       if (!metar) {
-        html += "<p>No METAR for " + icao + " or anywhere nearby in the data.</p></div>";
-        return;
+        if (!station) html += "<p>No METAR for " + icao + " or anywhere nearby in the data.</p>";
+      } else {
+        if (!own) {
+          html += "<p>" + (station ? "" : "No METAR from " + icao + ". ") + "Nearest METAR: <strong>" + metar.icao +
+            "</strong>, " + n(near.nm, 0) + " NM away" + (station ? ", " + esc(utcTime(metar.time)) : "") +
+            ". Use it only as a guide for " + icao + ".</p>";
+        }
+        html += '<p class="wx-raw">' + esc(metar.raw) + "</p>";
+        if (taf) {
+          html += "<details><summary>TAF " + metar.icao + ", issued " + esc(utcTime(taf.issued)) +
+            '</summary><p class="wx-raw">' + esc(taf.raw) + "</p></details>";
+        }
+        if (own) {
+          html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao +
+            '">Fill ' + icao + " weather</button>";
+        } else if (station) {
+          html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao +
+            '" data-only="visceil">Use ' + metar.icao + " visibility and ceiling</button>";
+        } else {
+          html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao + '">Fill ' +
+            icao + " weather from " + metar.icao + "</button>";
+        }
       }
-      if (!own) {
-        html += "<p>No METAR from " + icao + ". Nearest report: <strong>" + metar.icao + "</strong>, " +
-          n(near.nm, 0) + " NM away. Use it only as a guide for " + icao + ".</p>";
-      }
-      html += '<p class="wx-raw">' + esc(metar.raw) + "</p>";
-      if (taf) {
-        html += "<details><summary>TAF " + metar.icao + ", issued " + esc(utcTime(taf.issued)) + '</summary><p class="wx-raw">' +
-          esc(taf.raw) + "</p></details>";
-      }
-      html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao + '">' +
-        (own ? "Fill " + icao + " weather" : "Fill " + icao + " weather from " + metar.icao) + "</button>";
       if (wx.filled[icao]) html += '<p class="hint">' + esc(wx.filled[icao]) + "</p>";
       html += "</div>";
     });
     box.innerHTML = html;
   }
 
-  // Put a METAR's values into an aerodrome's weather fields.
-  function fillWeather(icao, fromIcao) {
-    var metar = reportFor(wx.data && wx.data.metars, fromIcao);
-    if (!metar) return;
-    var p = calc.parseMetar(metar.raw);
+  function ageChip(iso) {
+    var old = (Date.now() - Date.parse(iso)) / 60000 > 60;
+    return '<span class="chip ' + (old ? "chip-warn" : "chip-ok") + '">' + esc(utcTime(iso)) + ", " +
+      esc(ageText(iso)) + "</span>";
+  }
+
+  // Put weather into an aerodrome's fields: from its IPMA station ("ipma"),
+  // from a METAR, or only a METAR's visibility and ceiling (only "visceil").
+  function fillWeather(icao, from, only) {
     var w = state.wx[icao];
-    if (p.qnh !== null) w.qnh = String(p.qnh);
-    if (p.tempC !== null) w.oat = String(p.tempC);
-    if (p.wind) {
-      w.dir = p.wind.dir === null || p.wind.kt === 0 ? "" : String(p.wind.dir);
-      w.kt = String(p.wind.kt);
-      w.gust = p.wind.gust === null ? "" : String(p.wind.gust);
+    var note;
+    if (from === "ipma") {
+      var s = reportFor(wx.data && wx.data.stations, icao);
+      if (!s) return;
+      if (s.qnh !== null) w.qnh = String(s.qnh);
+      if (s.tempC !== null) w.oat = String(Math.round(s.tempC));
+      w.dir = s.kt === 0 ? "" : String(s.dir);
+      w.kt = String(s.kt);
+      w.gust = s.maxKt !== null && s.maxKt > s.kt ? String(s.maxKt) : "";
+      note = "Filled from the IPMA station at " + utcTime(s.time) + " (the 10-min maximum goes in Gust). " +
+        "Add the visibility and ceiling.";
+    } else {
+      var metar = reportFor(wx.data && wx.data.metars, from);
+      if (!metar) return;
+      var p = calc.parseMetar(metar.raw);
+      if (only !== "visceil") {
+        if (p.qnh !== null) w.qnh = String(p.qnh);
+        if (p.tempC !== null) w.oat = String(p.tempC);
+        if (p.wind) {
+          w.dir = p.wind.dir === null || p.wind.kt === 0 ? "" : String(p.wind.dir);
+          w.kt = String(p.wind.kt);
+          w.gust = p.wind.gust === null ? "" : String(p.wind.gust);
+        }
+      }
+      if (p.visKm !== null) w.vis = p.cavok ? "cavok" : n(p.visKm, 1).replace(/\.0$/, "");
+      w.ceil = p.ceilFt === Infinity ? "none" : String(p.ceilFt);
+      note = (only === "visceil" ? "Visibility and ceiling from the " : "Filled from the ") + from + " METAR of " +
+        utcTime(metar.time) + "." +
+        (only !== "visceil" && p.wind && p.wind.variable && p.wind.kt > 0
+          ? " The wind is variable: enter the direction to plan with." : "");
     }
-    if (p.visKm !== null) w.vis = p.cavok ? "cavok" : n(p.visKm, 1).replace(/\.0$/, "");
-    w.ceil = p.ceilFt === Infinity ? "none" : String(p.ceilFt);
     w.same = false;
     WX_KEYS.forEach(function (key) {
       $(key + "-" + icao).value = w[key];
     });
     $("same-" + icao).checked = false;
-    wx.filled[icao] = "Filled from the " + fromIcao + " METAR of " + utcTime(metar.time) + "." +
-      (p.wind && p.wind.variable && p.wind.kt > 0 ? " The wind is variable: enter the direction to plan with." : "");
+    wx.filled[icao] = note;
     changed();
   }
 
@@ -1262,7 +1317,7 @@
     $("wx-refresh").addEventListener("click", loadWeather);
     $("briefing").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-fill]");
-      if (b) fillWeather(b.dataset.fill, b.dataset.from);
+      if (b) fillWeather(b.dataset.fill, b.dataset.from, b.dataset.only);
     });
     // Copy the route's codes, then let the link open IPPC as usual.
     $("ippc-link").addEventListener("click", function () {
