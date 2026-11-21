@@ -10,7 +10,8 @@
  *   take-off: 50 ft distance x1.5 <= TORA
  *   landing:  50 ft distance x1.5 <= LDA
  * plus, for a student solo flight (OM part A 5.2.4):
- *   TORA at least 600 m, landing 50 ft distance x1.67 <= LDA, crosswind
+ *   TORA at least 600 m, landing 50 ft distance x1.67 <= LDA (x1.92 on a
+ *   contaminated runway), weather minima (OM C 5), crosswind
  *   (gusts included) within the student's limit - 50 % of the maximum
  *   demonstrated unless the instructor has raised it (up to 100 %).
  *
@@ -37,7 +38,11 @@
     M_PER_FT: 0.3048,
     MAX_TAILWIND_KT: 10, // the POH corrections only go up to 10 kt
     OM_FACTOR: 1.5, // OM C 1.2 / 1.4
-    SOLO_LDA_FACTOR: 1.67, // OM A 5.2.4 (1.92 on a contaminated runway)
+    SOLO_LDA_FACTOR: 1.67, // OM A 5.2.4
+    SOLO_LDA_FACTOR_CONTAMINATED: 1.92, // OM A 5.2.4, contaminated runway
+    SUNSET_MARGIN_MIN: 30, // OM A: cross-country flights arrive 30 min before sunset
+    // OM C 5: weather minima for a student solo flight (day)
+    MINIMA: { local: { visKm: 5, ceilFt: 1500 }, xc: { visKm: 8, ceilFt: 2000 } },
     SOLO_MIN_TORA_M: 600, // OM A 5.2.4
     SOLO_XWIND_FRACTION: 0.5, // OM A 5.2.4: 50 % of the maximum demonstrated
     TODA_FACTOR: 1.15,
@@ -476,7 +481,10 @@
         if (solo) check("Solo: minimum TORA", C.SOLO_MIN_TORA_M, "TORA", rwy.tora);
       } else {
         check("50 ft ×" + C.OM_FACTOR, dist * C.OM_FACTOR, "LDA", rwy.lda);
-        if (solo) check("Solo: 50 ft ×" + C.SOLO_LDA_FACTOR, dist * C.SOLO_LDA_FACTOR, "LDA", rwy.lda);
+        if (solo) {
+          var f = site.contaminated ? C.SOLO_LDA_FACTOR_CONTAMINATED : C.SOLO_LDA_FACTOR;
+          check("Solo: 50 ft ×" + f, dist * f, "LDA", rwy.lda);
+        }
       }
     } else if (isTakeoff) {
       check("Ground roll", run, "TORA", rwy.tora);
@@ -514,7 +522,70 @@
     result.warnings.forEach(function (w) {
       result.problems.push(where + ": " + w);
     });
+    // Information only: the POH has no data for contaminated runways.
+    result.notes = site.contaminated
+      ? ["contaminated runway: the POH distances are for a dry runway, expect them to be longer"] : [];
     return result;
+  }
+
+  // OM C 5: visibility (km) and ceiling (ft AGL, Infinity = none) against the
+  // student solo minima, local (aerodrome) or cross-country.
+  function minimaCheck(crossCountry, visKm, ceilFt) {
+    var m = crossCountry ? C.MINIMA.xc : C.MINIMA.local;
+    var out = { crossCountry: crossCountry, visKm: m.visKm, ceilFt: m.ceilFt, problems: [] };
+    if (visKm < m.visKm) {
+      out.problems.push("visibility " + round(visKm, 1) + " km is below the " + m.visKm + " km solo minimum");
+    }
+    if (ceilFt < m.ceilFt) {
+      out.problems.push("ceiling " + Math.round(ceilFt) + " ft is below the " + m.ceilFt + " ft solo minimum");
+    }
+    out.ok = out.problems.length === 0;
+    return out;
+  }
+
+  // Sunset at an aerodrome, in minutes after 00:00 UTC on that date
+  // (NOAA solar equations, within about a minute). dateText: "2026-11-21".
+  function sunsetUtcMin(dateText, ad) {
+    var p = String(dateText).split("-").map(Number);
+    var day = (Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(p[0], 0, 0)) / 864e5;
+    var rad = Math.PI / 180;
+    var lat = parseDms(ad.arp[0]) * rad;
+    var lon = parseDms(ad.arp[1]);
+    var g = ((2 * Math.PI) / 365) * (day - 1 + (18 - 12) / 24); // around sunset time
+    var eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+      0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+    var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+      0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+    var cosH = Math.cos(90.833 * rad) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+    var ha = Math.acos(Math.max(-1, Math.min(1, cosH))) / rad;
+    return 720 - 4 * (lon - ha) - eqTime;
+  }
+
+  /*
+   * Daylight planning. input: { date, takeoffMin (UTC minutes or null), tripH,
+   * altH, dest (aerodrome or null), alt (aerodrome or null), crossCountry }.
+   * Landing = take-off + flight time + 10 min approach. Cross-country flights
+   * must land 30 min before sunset at the destination (OM A); local flights
+   * before sunset.
+   */
+  function daylight(input) {
+    var D = MB.data;
+    var out = { margin: input.crossCountry ? C.SUNSET_MARGIN_MIN : 0 };
+    if (!input.dest) return out;
+    var flightMin = input.tripH * 60 + D.APPROACH_MIN;
+    out.sunset = sunsetUtcMin(input.date, input.dest);
+    out.latestLanding = out.sunset - out.margin;
+    out.latestTakeoff = out.latestLanding - flightMin;
+    if (known(input.takeoffMin)) {
+      out.landing = input.takeoffMin + flightMin;
+      out.ok = out.landing <= out.latestLanding + 1e-9;
+      if (input.alt && known(input.altH)) {
+        out.altSunset = sunsetUtcMin(input.date, input.alt);
+        out.altLanding = out.landing + input.altH * 60 + D.APPROACH_MIN;
+        out.altOk = out.altLanding <= out.altSunset + 1e-9;
+      }
+    }
+    return out;
   }
 
   /*
@@ -580,6 +651,9 @@
     bestRunway: bestRunway,
     runwayCheck: runwayCheck,
     climbCheck: climbCheck,
+    minimaCheck: minimaCheck,
+    sunsetUtcMin: sunsetUtcMin,
+    daylight: daylight,
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = MB.calc;

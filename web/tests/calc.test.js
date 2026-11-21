@@ -43,8 +43,8 @@ test("basic empty weight = as weighed + oil + unusable fuel", () => {
   near(had.lb, 1174.75, 1e-9, "OK-HAD lb");
   near(had.moment, 34.774625, 1e-9, "OK-HAD moment");
   const kun = calc.basicEmpty(D.AIRCRAFT["OK-KUN"]);
-  near(kun.lb, 1504.125, 1e-9, "OK-KUN lb");
-  near(kun.moment, 59.96125, 1e-9, "OK-KUN moment");
+  near(kun.lb, 1506.0, 1e-9, "OK-KUN lb"); // 8 qt oil (OM: full oil)
+  near(kun.moment, 59.935, 1e-9, "OK-KUN moment");
 });
 
 test("OK-HAD dual, full fuel: ZFM/TOM as the Python version, OM fuel allowances", () => {
@@ -70,9 +70,10 @@ test("OK-HAD dual, full fuel: ZFM/TOM as the Python version, OM fuel allowances"
 
 test("OK-KUN dual, full fuel: within limits", () => {
   const r = run("OK-KUN", [75 * KG, 85 * KG, 0, 5 * KG], 40, 1.0, "LPFR");
-  near(r.byName.ZFM.lb, 1867.8873, 1e-3, "ZFM lb");
-  near(r.byName.TOM.lb, 2100.8873, 1e-3, "TOM lb");
-  near(r.byName.TOM.cg, 40.7221, 1e-3, "TOM cg");
+  near(r.byName.ZFM.lb, 1869.7623, 1e-3, "ZFM lb");
+  near(r.byName.ZFM.cg, 39.7602, 1e-3, "ZFM cg");
+  near(r.byName.TOM.lb, 2102.7623, 1e-3, "TOM lb");
+  near(r.byName.TOM.cg, 40.6733, 1e-3, "TOM cg");
   assert.deepEqual(r.problems, []);
 });
 
@@ -213,4 +214,43 @@ test("obstacle clearance, capped by the altitude limit", () => {
   const low = calc.climbCheck(D.AIRCRAFT["OK-HAD"], { ...site, weather: { qnh: 1018, oat: 24, dir: 0, kt: 0 } },
     { nm: 1, elevationFt: 659, limitFt: 1000, gs: 67 });
   assert.equal(low.obstacle.ok, false);
+});
+
+test("solo weather minima (OM C 5)", () => {
+  assert.equal(calc.minimaCheck(false, 6, 1600).ok, true); // local: 5 km, 1500 ft
+  assert.deepEqual(calc.minimaCheck(false, 4, 3000).problems,
+    ["visibility 4 km is below the 5 km solo minimum"]);
+  assert.equal(calc.minimaCheck(true, 6, 1800).problems.length, 2); // cross-country: 8 km, 2000 ft
+  assert.equal(calc.minimaCheck(true, 10, Infinity).ok, true); // CAVOK
+});
+
+test("contaminated runway: x1.92 for a solo landing, note for everyone", () => {
+  const ac = D.AERODROMES && D.AIRCRAFT["OK-HAD"];
+  const site = { ...LPEV_TEST, contaminated: true };
+  const solo = calc.runwayCheck(ac, "landing", site, 1400, { rules: "om", solo: true });
+  assert.deepEqual(solo.lines.map((l) => l.label), ["50 ft ×1.5", "Solo: 50 ft ×1.92"]);
+  near(solo.lines[1].need, solo.dist * 1.92, 1e-9, "x1.92");
+  assert.equal(solo.notes.length, 1);
+  const dual = calc.runwayCheck(ac, "landing", site, 1400, { rules: "om" });
+  assert.equal(dual.lines.length, 1);
+  assert.equal(dual.notes.length, 1);
+});
+
+test("sunset and the 30 min rule for cross-country flights (OM A)", () => {
+  // Lisbon: about 20:05 UTC on 21 June and 17:18 UTC on 21 December
+  const lisbon = { arp: ["38 43 00N", "009 08 00W"] };
+  near(calc.sunsetUtcMin("2026-06-21", lisbon), 20 * 60 + 5, 4, "Lisbon midsummer");
+  near(calc.sunsetUtcMin("2026-12-21", lisbon), 17 * 60 + 18, 4, "Lisbon midwinter");
+  const A = D.AERODROMES;
+  const xc = calc.daylight({ date: "2026-11-21", takeoffMin: 15 * 60, tripH: 1, altH: 0.9,
+    dest: A.LPEV, alt: A.LPFR, crossCountry: true });
+  near(xc.latestLanding, xc.sunset - 30, 1e-9, "latest landing");
+  assert.equal(xc.landing, 15 * 60 + 70); // 1:00 + 10 min approach
+  assert.equal(xc.latestTakeoff, xc.latestLanding - 70);
+  assert.equal(xc.ok, xc.landing <= xc.latestLanding);
+  near(xc.altLanding, xc.landing + 0.9 * 60 + 10, 1e-9, "landing at the alternate");
+  const local = calc.daylight({ date: "2026-11-21", takeoffMin: null, tripH: 1, altH: 0.3,
+    dest: A.LPPM, alt: A.LPFR, crossCountry: false });
+  assert.equal(local.margin, 0);
+  assert.equal(local.landing, undefined);
 });

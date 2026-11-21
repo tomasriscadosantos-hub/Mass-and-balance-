@@ -26,9 +26,12 @@ It follows the Flying Academy Operations Manual (Rev. 1, Sep 2024):
 | Fuel | C 2.1 | Minimum fuel = taxi + trip + alternate + 45 min final reserve. Trip and alternate each include 10 min for the approach and landing. It shows the breakdown and the extra fuel. |
 | Take-off | C 1.2 | 50 ft distance ×1.5 ≤ TORA, worked out at the maximum take-off mass |
 | Landing | C 1.4 | 50 ft distance ×1.5 ≤ LDA, worked out at the maximum landing mass |
-| Basic empty mass | C 3.2.1 | Includes unusable fuel and oil (the weighing protocols are corrected for this) |
+| Basic empty mass | C 3.2.1 | Includes unusable fuel and full oil (the weighing protocols are corrected for this) |
 | Student solo (C152 with the instructor seat empty) | A 5.2.4, A 5.x | TORA at least 600 m, landing distance ×1.67 ≤ LDA, crosswind including gusts within the student's limit (50 % of the maximum demonstrated unless the instructor raised it, up to 100 %), at most 3 h in the C152 / 3.5 h in the C172 |
 | Crosswind with a student as PIC, gusts included | C 1.4 | Flags anything above the maximum demonstrated |
+| Contaminated runway | A 5.2.4 | Tick it per aerodrome. Solo landing then uses ×1.92, and a note says the POH distances are for a dry runway. |
+| Student solo weather minima | C 5 | Visibility and ceiling at every aerodrome on the route. Local flight: 5 km and 1500 ft AGL. Cross-country: 8 km and 2000 ft AGL. |
+| Daylight | A (risk register) | Sunset at the destination, worked out from its position and the date. Cross-country flights land 30 min before sunset. With a take-off time (UTC) it checks the planned landing, and warns if a diversion to the alternate would land after sunset. |
 
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
 LDA) is still there as an option. The alternate leg is measured from the destination, using the
@@ -163,11 +166,11 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    | | As weighed | Oil | Unusable fuel | Basic empty weight |
    |---|---|---|---|---|
    | OK-HAD (protocol 014/2023, 30 Mar 2023) | 1154.5 lb, moment 34.58 | 6 qt, 11.25 lb at −14.7 in | 1.5 gal, 9 lb at 40.0 in | **1174.75 lb, moment 34.77, arm 29.60 in** |
-   | OK-KUN (protocol of 16 Feb 2024) | 1473 lb, moment 59.32 | 7 qt, 13.1 lb at −14.0 in | 3 gal, 18 lb at 46.0 in | **1504.1 lb, moment 59.96, arm 39.86 in** |
+   | OK-KUN (protocol of 16 Feb 2024) | 1473 lb, moment 59.32 | 8 qt, 15 lb at −14.0 in | 3 gal, 18 lb at 46.0 in | **1506.0 lb, moment 59.94, arm 39.80 in** |
 
    Oil quantities:
    - OK-HAD: 6 qt (no oil filter).
-   - OK-KUN: kept between 5 and 7 qt, so the heavier 7 qt is used.
+   - OK-KUN: 8 qt, full oil, as the OM defines the basic empty mass.
 2. **Aerodrome data.** Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
    ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
    published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are

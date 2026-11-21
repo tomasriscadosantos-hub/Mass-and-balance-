@@ -48,9 +48,10 @@
         </div>
         <div class="fields" id="stations"></div>
         <div class="solo" id="solo-box" hidden>
-          <p class="solo-note"><strong>Solo flight.</strong> Student limits apply (OM A 5.2.4): TORA at least
-            600 m, LDA at least 1.67 × the landing distance, crosswind within the limit below, and a
-            <span id="solo-hours"></span> maximum flight time.</p>
+          <p class="solo-note"><strong>Solo flight.</strong> Student limits apply (OM A 5.2.4 and C 5): TORA at
+            least 600 m, LDA at least 1.67 × the landing distance (1.92 if contaminated), crosswind within the
+            limit below, weather minima at each aerodrome, and a <span id="solo-hours"></span> maximum flight
+            time.</p>
           <div class="field">
             <label for="xwind">Student crosswind limit</label>
             <div class="input-row"><input id="xwind" type="text" inputmode="decimal" autocomplete="off"><span class="unit">kt</span></div>
@@ -94,6 +95,17 @@
           </div>
           <p class="error" id="err-trip" hidden></p>
         </div>
+        <div class="fields">
+          <div class="field">
+            <label for="date">Date</label>
+            <input id="date" type="date">
+          </div>
+          <div class="field">
+            <label for="tkof">Take-off time UTC</label>
+            <input id="tkof" type="time">
+          </div>
+        </div>
+        <p class="hint" id="daylight-hint"></p>
         <div class="field">
           <label for="alt">Alternate</label>
           <select id="alt"></select>
@@ -161,7 +173,10 @@
         <summary>How the checks work</summary>
         <ul>
           <li><strong>Flying Academy OM</strong> (part C 1.2 and 1.4), worked out at the maximum take-off and landing mass: take-off 50 ft distance ×1.5 &lt; TORA, landing 50 ft distance ×1.5 &lt; LDA.</li>
-          <li>Student solo (OM part A 5.2.4): TORA at least 600 m, landing 50 ft distance ×1.67 &lt; LDA (×1.92 on a contaminated runway, not covered here), crosswind including gusts within 50 % of the maximum demonstrated unless the instructor has raised it.</li>
+          <li>Student solo (OM part A 5.2.4): TORA at least 600 m, landing 50 ft distance ×1.67 &lt; LDA (×1.92 on a contaminated runway), crosswind including gusts within 50 % of the maximum demonstrated unless the instructor has raised it.</li>
+          <li>Student solo weather minima (OM part C 5, day), at every aerodrome on the route: local flight 5 km and ceiling 1500 ft AGL, cross-country 8 km and 2000 ft AGL. Visibility 9999 counts as 10 km; type CAVOK, or "none" for no ceiling.</li>
+          <li>Daylight: cross-country flights land 30 min before sunset at the destination (OM part A), local flights before sunset. Sunset is worked out for the aerodrome's position and date.</li>
+          <li>Contaminated runway: the POH has no data for it, so the distances are for a dry runway and will be longer in reality.</li>
           <li><strong>Class B (old sheet)</strong>, at the actual mass: take-off ground roll &lt; TORA and 50 ft distance &lt; TODA, then ×1.15 &lt; TODA and ×1.3 &lt; ASDA with a clearway or stopway, or ×1.25 &lt; TORA without. Landing ground roll &lt; LDA and 50 ft distance &lt; 70 % of LDA.</li>
           <li>POH corrections: −10 % for each 9 kt of headwind, +10 % for each 2 kt of tailwind (up to 10 kt). Dry grass: +15 % (take-off) or +45 % (landing) of the ground roll. Gusts count for the crosswind limit only.</li>
           <li>Pressure altitude = elevation + (1013 − QNH) × 27 ft. Density altitude = PA + 120 ft per °C above ISA.</li>

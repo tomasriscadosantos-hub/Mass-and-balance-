@@ -73,8 +73,8 @@ AIRCRAFT = {
         # in POH figure 6-1.
         "weighed": (1473.0, 59.317),
         "add_to_weighed": [
-            # kept between 5 and 7 qt; 7 qt (the heavier end) is used here
-            ("Oil, 7 qt", 13.125, -14.0),
+            # OM C 3.2.1: the basic empty mass includes full oil, 8 qt in the 172P
+            ("Oil, 8 qt (full)", 15.0, -14.0),
             ("Unusable fuel, 3 gal (standard tanks)", 18.0, 46.0),
         ],
         # Always flown with two: student and instructor (rear seats empty,

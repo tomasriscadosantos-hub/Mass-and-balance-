@@ -53,8 +53,8 @@
       // POH figure 6-1.
       weighed: { lb: 1473.0, moment: 59.317, source: "Weighing of 16 Feb 2024" },
       addToWeighed: [
-        // kept between 5 and 7 qt; the heavier 7 qt is used
-        { item: "Oil, 7 qt", lb: 13.125, arm: -14.0 },
+        // OM C 3.2.1: the basic empty mass includes full oil, 8 qt in the 172P
+        { item: "Oil, 8 qt (full)", lb: 15.0, arm: -14.0 },
         { item: "Unusable fuel, 3 gal (standard tanks)", lb: 18.0, arm: 46.0 },
       ],
       // Always flown with two: student and instructor (rear seats empty).

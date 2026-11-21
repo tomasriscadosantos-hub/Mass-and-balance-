@@ -11,7 +11,7 @@
   var OTHER = "OTHER";
   var DEP = D.DEPARTURE;
 
-  var WX_KEYS = ["qnh", "oat", "dir", "kt", "gust"];
+  var WX_KEYS = ["qnh", "oat", "dir", "kt", "gust", "vis", "ceil"];
 
   // Example: a navigation flight to Évora with Faro as the alternate.
   var EXAMPLE = {
@@ -20,6 +20,8 @@
     wUnit: "kg",
     loads: ["75", "85", "", ""],
     xwind: "",
+    date: "", // empty = today
+    tkof: "",
     fUnit: "gal",
     fuel: "40.0",
     fuelFull: true,
@@ -35,10 +37,12 @@
     method: "interp",
   };
   Object.keys(D.AERODROMES).forEach(function (icao) {
-    EXAMPLE.wx[icao] = { qnh: "", oat: "", dir: "", kt: "", gust: "", rwy: "auto", same: true };
+    EXAMPLE.wx[icao] = { qnh: "", oat: "", dir: "", kt: "", gust: "", vis: "", ceil: "", rwy: "auto",
+      same: true, contaminated: false };
   });
-  Object.assign(EXAMPLE.wx.LPPM, { qnh: "1013", oat: "18", same: false });
-  Object.assign(EXAMPLE.wx.LPEV, { qnh: "1015", oat: "30", dir: "310", kt: "8" });
+  Object.assign(EXAMPLE.wx.LPPM, { qnh: "1013", oat: "18", vis: "10", ceil: "3000", same: false });
+  Object.assign(EXAMPLE.wx.LPEV, { qnh: "1015", oat: "30", dir: "310", kt: "8", vis: "10", ceil: "4000",
+    same: false });
 
   var state = load();
   var last = null; // last results, for redrawing the chart on resize
@@ -246,10 +250,15 @@
         wxField(icao, "dir", "Wind from", "°", "numeric", "calm") +
         wxField(icao, "kt", "Wind", "kt", "decimal", "0") +
         wxField(icao, "gust", "Gust", "kt", "decimal", "none") +
+        wxField(icao, "vis", "Visibility", "km", "decimal", "9999 = 10") +
+        wxField(icao, "ceil", "Ceiling", "ft AGL", "numeric", "none") +
         "</div>" +
         '<p class="error" id="err-wx-' + icao + '" hidden></p>' +
+        '<div class="ad-inputs" id="rwy-wrap-' + icao + '">' +
         '<div class="field"><label for="rwy-' + icao + '">Runway in use</label><select id="rwy-' + icao + '">' +
-        rwys + "</select></div>" + obstacle + "</div>" +
+        rwys + "</select></div>" +
+        '<label class="checkbox"><input type="checkbox" id="cont-' + icao + '"> Runway contaminated ' +
+        "(standing water, slush, snow)</label></div>" + obstacle + "</div>" +
         '<div class="reports" id="reports-' + icao + '"></div>';
       box.appendChild(el);
 
@@ -274,6 +283,12 @@
         state.wx[icao].rwy = rwy.value;
         changed();
       });
+      var cont = $("cont-" + icao);
+      cont.checked = !!state.wx[icao].contaminated;
+      cont.addEventListener("change", function () {
+        state.wx[icao].contaminated = cont.checked;
+        changed();
+      });
     });
 
     var on = $("obs-on");
@@ -292,8 +307,16 @@
     });
   }
 
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
   function fillSimpleInputs() {
     $("xwind").value = state.xwind;
+    $("date").value = state.date || today();
+    $("tkof").value = state.tkof;
     $("fuel").value = state.fuel;
     $("trip-h").value = state.tripH;
     $("trip-m").value = state.tripM;
@@ -326,6 +349,14 @@
     });
     $("xwind").addEventListener("input", function (e) {
       state.xwind = e.target.value;
+      changed();
+    });
+    $("date").addEventListener("input", function (e) {
+      state.date = e.target.value === today() ? "" : e.target.value; // empty = always today
+      changed();
+    });
+    $("tkof").addEventListener("input", function (e) {
+      state.tkof = e.target.value;
       changed();
     });
     $("alt").addEventListener("change", function (e) {
@@ -374,6 +405,7 @@
       });
       $("same-" + icao).checked = !!state.wx[icao].same;
       $("rwy-" + icao).value = state.wx[icao].rwy;
+      $("cont-" + icao).checked = !!state.wx[icao].contaminated;
     });
     $("obs-on").checked = state.obstacle.on;
     ["nm", "elev", "limit", "gs"].forEach(function (key) {
@@ -393,15 +425,19 @@
     return hh + mm / 60;
   }
 
+  // Weather typed for one aerodrome. Empty fields stay null: QNH and OAT are
+  // needed only where the performance can be worked out, visibility and
+  // ceiling only for the solo minima. Wrongly typed fields go to fieldErrors.
   function readWeather(icao, fieldErrors) {
     var w = state.wx[icao];
+    var bad = [];
     var qnh = parse(w.qnh);
     var oat = parse(w.oat);
     var dir = parse(w.dir);
     var kt = parse(w.kt);
-    var bad = [];
-    if (qnh === null || isNaN(qnh) || qnh < 900 || qnh > 1100) bad.push(["qnh", "QNH (900 to 1100 hPa)"]);
-    if (oat === null || isNaN(oat) || oat < -60 || oat > 60) bad.push(["oat", "OAT in °C"]);
+    var gust = parse(w.gust);
+    if (qnh !== null && (isNaN(qnh) || qnh < 900 || qnh > 1100)) bad.push(["qnh", "QNH (900 to 1100 hPa)"]);
+    if (oat !== null && (isNaN(oat) || oat < -60 || oat > 60)) bad.push(["oat", "OAT in °C"]);
     if (kt === null) kt = 0;
     if (isNaN(kt) || kt < 0 || kt > 60) bad.push(["kt", "wind speed in kt"]);
     if (dir === null) {
@@ -410,13 +446,22 @@
     } else if (isNaN(dir) || dir < 0 || dir > 360) {
       bad.push(["dir", "wind direction (0 to 360°)"]);
     }
-    var gust = parse(w.gust);
     if (gust !== null && (isNaN(gust) || gust < kt || gust > 80)) {
       bad.push(["gust", "gust (at least the wind speed)"]);
     }
+    // Visibility in km; 9999 or other values from 100 up are read as metres.
+    // CAVOK = 10 km and no ceiling. Ceiling: "none", "NSC" or "SKC" = no ceiling.
+    var visText = String(w.vis || "").trim().toLowerCase();
+    var ceilText = String(w.ceil || "").trim().toLowerCase();
+    var vis = visText === "cavok" ? 10 : parse(visText);
+    if (vis !== null && !isNaN(vis) && vis >= 100) vis = vis / 1000;
+    if (vis !== null && (isNaN(vis) || vis < 0)) bad.push(["vis", "visibility in km"]);
+    var ceil = /^(none|nsc|skc|clr|ncd)$/.test(ceilText) || (visText === "cavok" && ceilText === "")
+      ? Infinity : parse(ceilText);
+    if (ceil !== null && (isNaN(ceil) || ceil < 0)) bad.push(["ceil", "ceiling in ft"]);
     fieldErrors[icao] = bad;
     if (bad.length) return null;
-    return { qnh: qnh, oat: oat, dir: dir, kt: kt, gust: gust };
+    return { qnh: qnh, oat: oat, dir: dir, kt: kt, gust: gust, vis: vis, ceil: ceil };
   }
 
   function compute() {
@@ -490,7 +535,56 @@
       { rules: state.rules, solo: solo, xwindLimitKt: xwindLimit });
     result.problems = result.problems.concat(result.perf.problems);
     result.notices = result.perf.notices;
+
+    // Daylight (OM A: cross-country flights land 30 min before sunset).
+    result.date = state.date || today();
+    result.day = calc.daylight({
+      date: result.date,
+      takeoffMin: clockMin(state.tkof),
+      tripH: tripH,
+      altH: altH,
+      dest: state.dest === OTHER ? null : D.AERODROMES[state.dest],
+      alt: altIcao ? D.AERODROMES[altIcao] : null,
+      crossCountry: state.dest !== DEP,
+    });
+    var d = result.day;
+    if (d.landing !== undefined && !d.ok) {
+      if (d.margin) {
+        result.problems.push("Daylight: landing at " + state.dest + " " + clock(d.landing) +
+          " UTC is later than 30 min before sunset (" + clock(d.latestLanding) + " UTC, OM A)");
+      } else {
+        result.notices.push("Daylight: landing at " + state.dest + " " + clock(d.landing) +
+          " UTC is after sunset (" + clock(d.sunset) + " UTC)");
+      }
+    }
+    if (d.altLanding !== undefined && !d.altOk) {
+      result.notices.push("Daylight: diverting to " + altIcao + ", you would land at " + clock(d.altLanding) +
+        " UTC, after sunset there (" + clock(d.altSunset) + " UTC)");
+    }
     return result;
+  }
+
+  // "14:30" -> 870 minutes, "" -> null
+  function clockMin(text) {
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(text || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  }
+  // 870 -> "14:30"
+  function clock(minutes) {
+    var t = ((Math.round(minutes) % 1440) + 1440) % 1440;
+    return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+  }
+  // UTC minutes on a date -> local time in Portugal, or "" if the browser can't tell.
+  function lisbon(dateText, minutes) {
+    try {
+      var p = dateText.split("-").map(Number);
+      var at = new Date(Date.UTC(p[0], p[1] - 1, p[2]) + Math.round(minutes) * 60000);
+      return new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Lisbon", hour: "2-digit", minute: "2-digit", hour12: false,
+      }).format(at);
+    } catch (e) {
+      return "";
+    }
   }
 
   function performance(ac, mb, altIcao, opts) {
@@ -509,31 +603,46 @@
     role(altIcao, "Alternate");
 
     var out = { involved: involved, roles: roles, cards: {}, problems: [], notices: [], fieldErrors: {} };
-    var source = null; // first aerodrome with data: the others can reuse its weather
+    var crossCountry = state.dest !== DEP; // OM A: a flight away from the home aerodrome
+    var source = null; // first aerodrome on the route: the others can reuse its weather
     involved.forEach(function (icao) {
       var ad = D.AERODROMES[icao];
       var card = (out.cards[icao] = { reports: [], source: source });
+      var wx = source && state.wx[icao].same ? out.cards[source].wx : readWeather(icao, out.fieldErrors);
+      if (!source) source = icao;
+      card.wx = wx;
+
+      // Student solo weather minima (OM C 5) at every aerodrome on the route.
+      if (opts.solo) {
+        if (!wx || wx.vis === null || wx.ceil === null) {
+          out.notices.push(icao + ": enter the visibility and ceiling to check the solo weather minima");
+        } else {
+          card.minima = calc.minimaCheck(crossCountry, wx.vis, wx.ceil);
+          card.minima.problems.forEach(function (p) {
+            out.problems.push(icao + ": " + p + " (OM C 5)");
+          });
+        }
+      }
+
       if (ad.elevationFt === null || !ad.runways.length) {
         card.missing = "Elevation and runways for " + icao + " are not in the data yet, so the take-off " +
           "and landing can't be worked out here. Add them to js/data.js from the AIP.";
         out.notices.push(icao + ": elevation and runways not in the data yet");
         return;
       }
-      var useSame = source && state.wx[icao].same;
-      var weather = useSame ? out.cards[source].weather : readWeather(icao, out.fieldErrors);
-      if (!source) source = icao;
-      if (!weather) {
+      if (!wx) return; // a mistyped field is shown on the card
+      if (wx.qnh === null || wx.oat === null) {
         card.waiting = true;
-        out.notices.push(icao + ": enter the weather to work out the performance");
+        out.notices.push(icao + ": enter the QNH and OAT to work out the performance");
         return;
       }
-      card.weather = weather;
       var choice = state.wx[icao].rwy;
       var rwy = ad.runways.filter(function (r) {
         return r.rwy === choice;
-      })[0] || calc.bestRunway(ad.runways, weather.dir, weather.kt);
-      card.site = { icao: icao, elevationFt: ad.elevationFt, rwy: rwy, weather: weather };
-      card.pa = calc.pressureAltitude(ad.elevationFt, weather.qnh);
+      })[0] || calc.bestRunway(ad.runways, wx.dir, wx.kt);
+      card.site = { icao: icao, elevationFt: ad.elevationFt, rwy: rwy, weather: wx,
+        contaminated: !!state.wx[icao].contaminated };
+      card.pa = calc.pressureAltitude(ad.elevationFt, wx.qnh);
     });
 
     var m = mb.byName;
@@ -549,6 +658,10 @@
       r.title = ev[3];
       card.reports.push(r);
       out.problems = out.problems.concat(r.problems);
+      if (r.notes.length && !card.notesNoted) {
+        card.notesNoted = true;
+        out.notices.push(ev[1] + ": " + r.notes[0]);
+      }
       if (r.unchecked && !card.uncheckedNoted) {
         card.uncheckedNoted = true;
         out.notices.push(ev[1] + ": declared distances not in the data yet, runway length not checked");
@@ -638,17 +751,23 @@
       return;
     }
     var problems = r.problems;
-    var notices = r.notices;
+    // Amber items: checks that couldn't be done (missing data or input) and plain notes.
+    var unchecked = r.notices.filter(function (p) {
+      return /not in the data|enter the/.test(p);
+    });
+    var notes = r.notices.filter(function (p) {
+      return unchecked.indexOf(p) < 0;
+    });
     var title;
     if (problems.length) {
       chip.className = "chip chip-lg chip-bad";
       chip.textContent = problems.length + (problems.length === 1 ? " problem" : " problems");
       title = '<span class="verdict-title bad">Not within limits</span>';
-    } else if (notices.length) {
+    } else if (unchecked.length) {
       chip.className = "chip chip-lg chip-warn";
       chip.textContent = "Not all checked";
       title = '<span class="verdict-title ok">No problems found</span>' +
-        '<span class="chip chip-warn">' + notices.length + " not checked</span>";
+        '<span class="chip chip-warn">' + unchecked.length + " not checked</span>";
     } else {
       chip.className = "chip chip-lg chip-ok";
       chip.textContent = "Within limits";
@@ -656,7 +775,9 @@
     }
     var items = problems.map(function (p) {
       return '<li><span class="chip chip-bad">Limit</span><span>' + esc(p) + "</span></li>";
-    }).concat(notices.map(function (p) {
+    }).concat(notes.map(function (p) {
+      return '<li><span class="chip chip-warn">Note</span><span>' + esc(p) + "</span></li>";
+    })).concat(unchecked.map(function (p) {
       return '<li><span class="chip chip-warn">Not checked</span><span>' + esc(p) + "</span></li>";
     }));
 
@@ -896,11 +1017,9 @@
       var missing = $("missing-" + icao);
       missing.hidden = !card.missing;
       missing.textContent = card.missing || "";
-      $("inputs-" + icao).hidden = !!card.missing;
-      if (card.missing) {
-        $("reports-" + icao).innerHTML = "";
-        return;
-      }
+      // Weather stays visible (solo minima, shared weather); runways only with data.
+      $("rwy-wrap-" + icao).hidden = !!card.missing;
+      if (icao === DEP) $("obstacle").hidden = !card.site;
       var canShare = !!card.source;
       $("same-wrap-" + icao).hidden = !canShare;
       $("same-label-" + icao).textContent = "Same weather as " + (card.source || "");
@@ -917,10 +1036,39 @@
         $("gs-obs").placeholder = card.climbSpeed ? String(card.climbSpeed) : "";
         setError("obs", state.obstacle.on ? card.obstacleError : "");
       }
-      var html = card.reports.map(reportHtml).join("");
+      var html = "";
+      if (card.minima) {
+        var mn = card.minima;
+        html += '<p class="minima">' + (mn.ok ? '<span class="chip chip-ok">OK</span>' : '<span class="chip chip-bad">Below</span>') +
+          " Solo minima, " + (mn.crossCountry ? "cross-country" : "local flight") + " (OM C 5): " + mn.visKm +
+          " km and " + mn.ceilFt + " ft. Here: " + n(card.wx.vis, 1) + " km, " +
+          (card.wx.ceil === Infinity ? "no ceiling" : n(card.wx.ceil, 0) + " ft") + ".</p>";
+      }
+      html += card.reports.map(reportHtml).join("");
       if (icao === DEP) html += climbHtml(card);
       $("reports-" + icao).innerHTML = html;
     });
+  }
+
+  function renderDaylight(r) {
+    var el = $("daylight-hint");
+    var d = r.day;
+    if (!d) {
+      el.textContent = "";
+      return;
+    }
+    if (d.sunset === undefined) {
+      el.textContent = "Choose a destination from the list to work out the sunset.";
+      return;
+    }
+    var local = lisbon(r.date, d.sunset);
+    var text = "Sunset at " + state.dest + " " + clock(d.sunset) + " UTC" + (local ? " (" + local + " in Portugal)" : "") + ". ";
+    text += d.margin
+      ? "Land by " + clock(d.latestLanding) + " UTC (30 min before sunset, OM A), so take off by " +
+        clock(d.latestTakeoff) + " UTC."
+      : "Take off by " + clock(d.latestTakeoff) + " UTC to land before sunset.";
+    if (d.landing !== undefined) text += " Planned landing " + clock(d.landing) + " UTC.";
+    el.textContent = text;
   }
 
   function renderStatic() {
@@ -967,6 +1115,7 @@
     renderLimits(r);
     renderChart(r);
     renderPerformance(r);
+    renderDaylight(r);
   }
 
   // ---------------------------------------------------------------- start
