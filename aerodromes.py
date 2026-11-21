@@ -25,7 +25,7 @@ AERODROMES = {
     "LPPM": {
         "name": "Portimao",
         "nm_from_departure": 0,
-        "elevation_ft": None,
+        "elevation_ft": 5,       # 1.47 m, NAV Portugal sunrise/sunset tables 2026
         "runways": [
             # {"rwy": "..", "bearing": None, "tora": ..., "toda": ..., "asda": ..., "lda": ..., "surface": "paved"},
         ],

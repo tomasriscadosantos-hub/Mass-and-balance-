@@ -400,13 +400,16 @@
     var type = MB.poh.TYPES[ac.perf];
     var isTakeoff = kind === "take-off";
     var wx = site.weather;
-    var rwy = site.rwy;
+    // Without runway data (only the elevation): zero wind, nothing to check against.
+    var noRunway = !site.rwy;
+    var rwy = site.rwy || { rwy: null, bearing: null, tora: null, toda: null, asda: null, lda: null,
+      surface: "paved" };
     var pa = pressureAltitude(site.elevationFt, wx.qnh);
-    var wc = windComponents(runwayBearing(rwy), wx.dir, wx.kt);
+    var wc = noRunway ? [0, 0] : windComponents(runwayBearing(rwy), wx.dir, wx.kt);
     var head = wc[0];
     var cross = wc[1];
-    var gustCross = known(wx.gust) ? windComponents(runwayBearing(rwy), wx.dir, wx.gust)[1] : cross;
-    var where = kind + " " + site.icao + " RWY " + rwy.rwy;
+    var gustCross = !noRunway && known(wx.gust) ? windComponents(runwayBearing(rwy), wx.dir, wx.gust)[1] : cross;
+    var where = kind + " " + site.icao + (noRunway ? "" : " RWY " + rwy.rwy);
     var massNote = null;
     if (rules === "om") {
       mass = isTakeoff ? ac.maxTakeoff : ac.maxLanding;
@@ -418,6 +421,7 @@
       solo: solo,
       icao: site.icao,
       rwy: rwy,
+      noRunway: noRunway,
       mass: mass,
       massNote: massNote,
       weather: wx,
@@ -445,7 +449,9 @@
     var grass = rwy.surface === "grass";
     var grassPct = isTakeoff ? C.GRASS_TAKEOFF : C.GRASS_LANDING;
     result.corrections = [];
-    if (Math.abs(head) >= 0.5) {
+    if (noRunway) {
+      result.corrections.push("no wind correction (runway direction not in the data)");
+    } else if (Math.abs(head) >= 0.5) {
       var change = (windFactor(head) - 1) * 100;
       result.corrections.push((change > 0 ? "+" : "−") + Math.abs(change).toFixed(1) + " % for the " +
         (head >= 0 ? "headwind" : "tailwind"));
@@ -543,37 +549,59 @@
     return out;
   }
 
-  // Sunset at an aerodrome, in minutes after 00:00 UTC on that date
-  // (NOAA solar equations, within about a minute). dateText: "2026-11-21".
-  function sunsetUtcMin(dateText, ad) {
+  /*
+   * Sun times at an aerodrome on a date, in minutes after 00:00 UTC: start of
+   * morning civil twilight, sunrise, sunset and end of evening civil twilight
+   * (night begins). NOAA solar equations; within 2 min of NAV Portugal's
+   * sunrise/sunset tables. dateText: "2026-11-21".
+   */
+  function sunTimes(dateText, ad) {
     var p = String(dateText).split("-").map(Number);
     var day = (Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(p[0], 0, 0)) / 864e5;
     var rad = Math.PI / 180;
     var lat = parseDms(ad.arp[0]) * rad;
     var lon = parseDms(ad.arp[1]);
-    var g = ((2 * Math.PI) / 365) * (day - 1 + (18 - 12) / 24); // around sunset time
-    var eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
-      0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
-    var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
-      0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
-    var cosH = Math.cos(90.833 * rad) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
-    var ha = Math.acos(Math.max(-1, Math.min(1, cosH))) / rad;
-    return 720 - 4 * (lon - ha) - eqTime;
+    function event(zenith, rising, hourUtc) {
+      var g = ((2 * Math.PI) / 365) * (day - 1 + (hourUtc - 12) / 24);
+      var eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+        0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+      var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+        0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+      var cosH = Math.cos(zenith * rad) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+      var ha = Math.acos(Math.max(-1, Math.min(1, cosH))) / rad;
+      return 720 - 4 * (lon + (rising ? ha : -ha)) - eqTime;
+    }
+    return {
+      twilightStart: event(96, true, 7),
+      sunrise: event(90.833, true, 7),
+      sunset: event(90.833, false, 18),
+      twilightEnd: event(96, false, 18),
+    };
+  }
+
+  function sunsetUtcMin(dateText, ad) {
+    return sunTimes(dateText, ad).sunset;
   }
 
   /*
    * Daylight planning. input: { date, takeoffMin (UTC minutes or null), tripH,
-   * altH, dest (aerodrome or null), alt (aerodrome or null), crossCountry }.
-   * Landing = take-off + flight time + 10 min approach. Cross-country flights
-   * must land 30 min before sunset at the destination (OM A); local flights
-   * before sunset.
+   * altH, departure, dest (aerodrome or null), alt (aerodrome or null),
+   * crossCountry }. Landing = take-off + flight time + 10 min approach.
+   * Cross-country flights must land 30 min before sunset at the destination
+   * (OM A); local flights before sunset. Take-off before sunrise is flagged.
    */
   function daylight(input) {
     var D = MB.data;
     var out = { margin: input.crossCountry ? C.SUNSET_MARGIN_MIN : 0 };
+    if (input.departure) {
+      out.departureSun = sunTimes(input.date, input.departure);
+      if (known(input.takeoffMin)) out.beforeSunrise = input.takeoffMin < out.departureSun.sunrise;
+    }
     if (!input.dest) return out;
     var flightMin = input.tripH * 60 + D.APPROACH_MIN;
-    out.sunset = sunsetUtcMin(input.date, input.dest);
+    var sun = sunTimes(input.date, input.dest);
+    out.sunset = sun.sunset;
+    out.nightFrom = sun.twilightEnd;
     out.latestLanding = out.sunset - out.margin;
     out.latestTakeoff = out.latestLanding - flightMin;
     if (known(input.takeoffMin)) {
@@ -652,6 +680,7 @@
     runwayCheck: runwayCheck,
     climbCheck: climbCheck,
     minimaCheck: minimaCheck,
+    sunTimes: sunTimes,
     sunsetUtcMin: sunsetUtcMin,
     daylight: daylight,
   };

@@ -106,9 +106,10 @@
   var AERODROMES = {
     LPPM: {
       name: "Portimão",
-      arp: ["37 08 58N", "008 35 02W"], // check against the AIP
-      elevationFt: null,
-      source: null,
+      // NAV Portugal sunrise/sunset tables 2026: 37 08 58N 008 35 02W, elevation 1.47 m.
+      arp: ["37 08 58N", "008 35 02W"],
+      elevationFt: 5,
+      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); runways still to add",
       runways: [],
     },
     LPFR: {

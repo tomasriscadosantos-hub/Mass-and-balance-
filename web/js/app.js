@@ -543,18 +543,23 @@
       takeoffMin: clockMin(state.tkof),
       tripH: tripH,
       altH: altH,
+      departure: D.AERODROMES[DEP],
       dest: state.dest === OTHER ? null : D.AERODROMES[state.dest],
       alt: altIcao ? D.AERODROMES[altIcao] : null,
       crossCountry: state.dest !== DEP,
     });
     var d = result.day;
+    if (d.beforeSunrise) {
+      result.notices.push("Daylight: take-off at " + clock(clockMin(state.tkof)) + " UTC is before sunrise at " +
+        DEP + " (" + clock(d.departureSun.sunrise) + " UTC)");
+    }
     if (d.landing !== undefined && !d.ok) {
       if (d.margin) {
         result.problems.push("Daylight: landing at " + state.dest + " " + clock(d.landing) +
           " UTC is later than 30 min before sunset (" + clock(d.latestLanding) + " UTC, OM A)");
       } else {
         result.notices.push("Daylight: landing at " + state.dest + " " + clock(d.landing) +
-          " UTC is after sunset (" + clock(d.sunset) + " UTC)");
+          " UTC is after sunset (" + clock(d.sunset) + " UTC); night from " + clock(d.nightFrom) + " UTC");
       }
     }
     if (d.altLanding !== undefined && !d.altOk) {
@@ -624,11 +629,17 @@
         }
       }
 
-      if (ad.elevationFt === null || !ad.runways.length) {
+      if (ad.elevationFt === null) {
         card.missing = "Elevation and runways for " + icao + " are not in the data yet, so the take-off " +
           "and landing can't be worked out here. Add them to js/data.js from the AIP.";
         out.notices.push(icao + ": elevation and runways not in the data yet");
         return;
+      }
+      if (!ad.runways.length) {
+        // Elevation known: POH distances, climb and obstacle still work.
+        card.noRunways = true;
+        card.missing = "Runways for " + icao + " are not in the data yet. The distances below are without " +
+          "wind, and the runway length isn't checked. Add the runways to js/data.js from the AIP.";
       }
       if (!wx) return; // a mistyped field is shown on the card
       if (wx.qnh === null || wx.oat === null) {
@@ -637,7 +648,7 @@
         return;
       }
       var choice = state.wx[icao].rwy;
-      var rwy = ad.runways.filter(function (r) {
+      var rwy = card.noRunways ? null : ad.runways.filter(function (r) {
         return r.rwy === choice;
       })[0] || calc.bestRunway(ad.runways, wx.dir, wx.kt);
       card.site = { icao: icao, elevationFt: ad.elevationFt, rwy: rwy, weather: wx,
@@ -664,7 +675,9 @@
       }
       if (r.unchecked && !card.uncheckedNoted) {
         card.uncheckedNoted = true;
-        out.notices.push(ev[1] + ": declared distances not in the data yet, runway length not checked");
+        out.notices.push(ev[1] + (card.noRunways
+          ? ": runways not in the data yet, wind and runway length not checked"
+          : ": declared distances not in the data yet, runway length not checked"));
       }
     });
 
@@ -953,9 +966,11 @@
     var gust = wx.gust !== null && wx.gust !== undefined;
     var wind = wx.kt ? pad(wx.dir, 3) + "/" + pad(wx.kt, 2) + (gust ? "G" + pad(wx.gust, 2) : "") : "calm";
     var mass = n(r.mass, 0) + " lb" + (r.massNote ? " (" + r.massNote + ", as the OM requires)" : "");
-    var facts = "RWY " + esc(r.rwy.rwy) + " · " + mass + " · wind " + wind + " → " +
-      (r.head >= 0 ? "headwind " : "tailwind ") + n(Math.abs(r.head), 0) + " kt, crosswind " + n(r.cross, 0) +
-      " kt" + (gust ? " (" + n(r.gustCross, 0) + " in gusts)" : "") +
+    var windPart = r.noRunway
+      ? "wind " + wind + " (runway not in the data, so no head or cross wind)"
+      : "wind " + wind + " → " + (r.head >= 0 ? "headwind " : "tailwind ") + n(Math.abs(r.head), 0) +
+        " kt, crosswind " + n(r.cross, 0) + " kt" + (gust ? " (" + n(r.gustCross, 0) + " in gusts)" : "");
+    var facts = (r.noRunway ? "" : "RWY " + esc(r.rwy.rwy) + " · ") + mass + " · " + windPart +
       " · OAT " + n(wx.oat, 0) + " °C · QNH " + n(wx.qnh, 0) + " · PA " + n(r.pa, 0) + " ft · DA " +
       n(r.da, 0) + " ft";
     var html = '<div class="report"><div class="report-head"><span class="report-title">' + esc(r.title) +
@@ -1018,7 +1033,7 @@
       missing.hidden = !card.missing;
       missing.textContent = card.missing || "";
       // Weather stays visible (solo minima, shared weather); runways only with data.
-      $("rwy-wrap-" + icao).hidden = !!card.missing;
+      $("rwy-wrap-" + icao).hidden = !D.AERODROMES[icao].runways.length;
       if (icao === DEP) $("obstacle").hidden = !card.site;
       var canShare = !!card.source;
       $("same-wrap-" + icao).hidden = !canShare;
@@ -1062,7 +1077,9 @@
       return;
     }
     var local = lisbon(r.date, d.sunset);
-    var text = "Sunset at " + state.dest + " " + clock(d.sunset) + " UTC" + (local ? " (" + local + " in Portugal)" : "") + ". ";
+    var text = (d.departureSun ? "Sunrise at " + DEP + " " + clock(d.departureSun.sunrise) + " UTC. " : "") +
+      "Sunset at " + state.dest + " " + clock(d.sunset) + " UTC" + (local ? " (" + local + " in Portugal)" : "") +
+      ", night from " + clock(d.nightFrom) + " UTC. ";
     text += d.margin
       ? "Land by " + clock(d.latestLanding) + " UTC (30 min before sunset, OM A), so take off by " +
         clock(d.latestTakeoff) + " UTC."

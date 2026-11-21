@@ -31,12 +31,12 @@ It follows the Flying Academy Operations Manual (Rev. 1, Sep 2024):
 | Crosswind with a student as PIC, gusts included | C 1.4 | Flags anything above the maximum demonstrated |
 | Contaminated runway | A 5.2.4 | Tick it per aerodrome. Solo landing then uses ×1.92, and a note says the POH distances are for a dry runway. |
 | Student solo weather minima | C 5 | Visibility and ceiling at every aerodrome on the route. Local flight: 5 km and 1500 ft AGL. Cross-country: 8 km and 2000 ft AGL. |
-| Daylight | A (risk register) | Sunset at the destination, worked out from its position and the date. Cross-country flights land 30 min before sunset. With a take-off time (UTC) it checks the planned landing, and warns if a diversion to the alternate would land after sunset. |
+| Daylight | A (risk register) | Sunset at the destination, worked out from its position and the date. Cross-country flights land 30 min before sunset. With a take-off time (UTC) it checks the planned landing, warns if a diversion to the alternate would land after sunset, and warns about a take-off before sunrise. It also shows when night starts (end of civil twilight). Sun times are within 2 min of NAV Portugal's sunrise/sunset tables. |
 
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
 LDA) is still there as an option. The alternate leg is measured from the destination, using the
-aerodrome reference points in `js/data.js`. LPPM, LPFR and LPBJ coordinates there still need
-checking against the AIP.
+aerodrome reference points in `js/data.js`. LPPM's position and elevation come from NAV Portugal's sunrise/sunset tables. LPFR and LPBJ coordinates
+still need checking against the AIP.
 
 On top of the terminal version it adds:
 

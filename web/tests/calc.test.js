@@ -254,3 +254,41 @@ test("sunset and the 30 min rule for cross-country flights (OM A)", () => {
   assert.equal(local.margin, 0);
   assert.equal(local.landing, undefined);
 });
+
+test("sun times match NAV Portugal's LPPM sunrise/sunset tables 2026 (within 2 min)", () => {
+  // date: [civil twilight from, sunrise, sunset, civil twilight to], UTC
+  const nav = {
+    "2026-01-01": ["07:19", "07:48", "17:28", "17:57"],
+    "2026-03-30": ["05:57", "06:23", "18:55", "19:21"],
+    "2026-06-22": ["04:44", "05:15", "19:58", "20:29"],
+    "2026-09-22": ["05:56", "06:22", "18:32", "18:57"],
+    "2026-11-21": ["06:51", "07:19", "17:21", "17:49"],
+    "2026-12-03": ["07:02", "07:31", "17:17", "17:46"],
+  };
+  const min = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  for (const [date, times] of Object.entries(nav)) {
+    const s = calc.sunTimes(date, D.AERODROMES.LPPM);
+    [s.twilightStart, s.sunrise, s.sunset, s.twilightEnd].forEach((got, i) =>
+      near(got, min(times[i]), 2, `${date} event ${i}`));
+  }
+});
+
+test("daylight: take-off before sunrise is flagged", () => {
+  const A = D.AERODROMES;
+  const d = calc.daylight({ date: "2026-11-21", takeoffMin: 6 * 60 + 30, tripH: 1, altH: 0.3,
+    departure: A.LPPM, dest: A.LPPM, alt: A.LPFR, crossCountry: false });
+  assert.equal(d.beforeSunrise, true);
+  near(d.nightFrom, 17 * 60 + 49, 2, "night from (end of civil twilight)");
+});
+
+test("no runway data: zero wind, nothing checked, no wind warnings", () => {
+  const ac = D.AIRCRAFT["OK-HAD"];
+  const site = { icao: "LPPM", elevationFt: 5, rwy: null,
+    weather: { qnh: 1013, oat: 20, dir: 270, kt: 25, gust: 35 } };
+  const r = calc.runwayCheck(ac, "take-off", site, 1600, { rules: "om", solo: true });
+  assert.equal(r.noRunway, true);
+  assert.equal(r.head, 0);
+  assert.equal(r.unchecked, true);
+  assert.deepEqual(r.warnings, []);
+  near(r.dist, calc.takeoff("C152", 1670, 5, 20).total * 0.3048, 1e-9, "zero-wind distance");
+});
