@@ -84,11 +84,11 @@ inputs.
 
 **Weather and NOTAMs.** The deploy workflow also runs every 15 minutes. It downloads the latest
 METARs and TAFs for the app's aerodromes from aviationweather.gov, and the latest readings of the
-IPMA automatic stations at LPPM (station 878) and LPEV (station 843) from ema.ipma.pt. It publishes
+IPMA automatic stations at LPPM (878), LPEV (843) and LPSO (817) from ema.ipma.pt. It publishes
 them with the app as `weather.json`, because these services don't let web pages on other sites read
 them directly. In the app, the Weather and NOTAMs panel shows each report with its age:
 
-- **IPMA station (LPPM, LPEV):** the 10-minute mean wind, the 10-minute maximum, QNH and
+- **IPMA station (LPPM, LPEV, LPSO):** the 10-minute mean wind, the 10-minute maximum, QNH and
   temperature. **Fill** puts them into that aerodrome's weather fields (the maximum goes in Gust).
   **Live wind on IPMA** opens the station's page, which is newer than the app's copy (up to about
   25 minutes old). The stations measure no visibility or cloud.
@@ -221,12 +221,20 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    Oil quantities:
    - OK-HAD: 6 qt (no oil filter).
    - OK-KUN: 8 qt, full oil, as the OM defines the basic empty mass.
-2. **Aerodrome data.** LPPM's runway is 11/29 (numbers from its IPMA station), paved; its
-   declared distances are still missing. In the web app the data is in `web/js/data.js`.
-   Copy each aerodrome's elevation and runway declared distances (TORA, TODA,
-   ASDA, LDA in metres, surface, bearing) into `aerodromes.py`, from the AIP or the VFR Manual
-   published by NAV Portugal (ais.nav.pt). Until then the runway checks for that aerodrome are
-   skipped. Check the data again every AIRAC cycle.
+2. **Aerodrome data.** In the web app it is in `web/js/data.js`, in the terminal version in
+   `aerodromes.py`. Where it stands:
+
+   | Aerodrome | Source | Runway checks |
+   |---|---|---|
+   | LPPM Portimão | VFR Manual AD 2-LPPM (20-MAR-2025): RWY 11/29, 860 × 27 m asphalt; RWY 11 TORA/TODA 770, ASDA/LDA 860; RWY 29 TORA/TODA/ASDA 860, LDA 770 (THR displaced 90 m). True bearing 107.5°/287.5° from the threshold coordinates | Yes |
+   | LPEV Évora | AIP aerodrome chart (AIRAC 003-21): elevation, RWY 01/19 asphalt | Declared distances missing |
+   | LPSO Ponte de Sor | IPMA station 817: position, elevation 119 m, RWY 03/21 | Surface and declared distances missing |
+   | LPFR Faro, LPBJ Beja | — | Elevation and runways missing |
+
+   LPEV, LPSO, LPFR and LPBJ are in the AIP (AD 2), not in the VFR Manual. Copy the missing
+   elevation and runway data (TORA, TODA, ASDA, LDA in metres, surface, bearing) from the AIP
+   published by NAV Portugal (ais.nav.pt) into both files. Until then the runway checks for that
+   aerodrome are skipped. Check the data again every AIRAC cycle.
 
 Also check the arms, limits, fuel capacity and planning fuel flow against each aircraft's own
 POH and the school's procedures. To add another alternate, add it to `AERODROMES` with its

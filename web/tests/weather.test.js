@@ -31,6 +31,19 @@ test("IPMA aerodrome station file (ema.ipma.pt)", async () => {
   assert.equal(parseIpmaCsv("estacao,data\n"), null);
 });
 
+test("IPMA: -990 means no reading; a row without wind is skipped, a missing QNH is null", async () => {
+  const { parseIpmaCsv } = await load("weather.mjs");
+  const csv = [
+    CSV_HEAD,
+    "817,2026-11-22 11:00:00,1028.9,1029.1,1.0,1029.1,-990,16.9,8.8,59,331,5,314,12,3,21,h1,c1,h2,c2,0.0,0.0,17.3,7.6,x",
+    "817,2026-11-22 11:10:00,-990.0,-990.0,-990.0,-990.0,-990,-990.0,-990.0,-990.0,-990.0,-990,-990.0,-990,3,21,h1,c1,h2,c2,0.0,0.0,17.3,7.6,x",
+  ].join("\n");
+  const r = parseIpmaCsv(csv);
+  assert.equal(r.time, "2026-11-22T11:00:00Z");
+  assert.deepEqual([r.qnh, r.tempC, r.dir, r.kt, r.maxKt], [null, 16.9, 331, 5, 12]);
+  assert.deepEqual(r.runways, ["03", "21"]);
+});
+
 // Fake aviationweather.gov and IPMA. "down" makes that service answer 503.
 function fakeFetch(down) {
   const calls = [];

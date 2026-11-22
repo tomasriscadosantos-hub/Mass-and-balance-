@@ -138,6 +138,23 @@ const LPEV_TEST = {
   weather: { qnh: 1015, oat: 30, dir: 310, kt: 8, gust: null },
 };
 
+test("LPPM (VFR Manual AD 2-LPPM): RWY 11 TORA 770, RWY 29 LDA 770, checked", () => {
+  const ad = D.AERODROMES.LPPM;
+  const [r11, r29] = ad.runways;
+  assert.deepEqual([r11.tora, r11.lda, r29.tora, r29.lda], [770, 860, 860, 770]);
+  const site = (rwy) => ({ icao: "LPPM", elevationFt: ad.elevationFt, rwy,
+    weather: { qnh: 1013, oat: 15, dir: null, kt: 0, gust: null } });
+  const ac = D.AIRCRAFT["OK-KUN"];
+  const to = calc.runwayCheck(ac, "take-off", site(r11), 2400, { rules: "om" });
+  assert.deepEqual(to.lines.map((l) => [l.name, l.available, l.ok]), [["TORA", 770, true]]);
+  const ldg = calc.runwayCheck(ac, "landing", site(r29), 2400, { rules: "om" });
+  assert.deepEqual(ldg.lines.map((l) => [l.name, l.available, l.ok]), [["LDA", 770, true]]);
+  assert.deepEqual([to.problems, ldg.problems, to.notes, ldg.notes], [[], [], [], []]);
+  // headwind on RWY 29 (287.5 true) from a westerly wind
+  const w = calc.windComponents(r29.bearing, 270, 10);
+  assert.ok(w[0] > 9.5 && Math.abs(w[1]) < 3.1);
+});
+
 test("OM rules: x1.5 at maximum take-off / landing mass", () => {
   const ac = D.AIRCRAFT["OK-KUN"];
   const to = calc.runwayCheck(ac, "take-off", LPEV_TEST, 2100, { rules: "om" });

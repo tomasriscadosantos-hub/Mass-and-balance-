@@ -8,10 +8,11 @@
 import { buildWeather } from "./weather.mjs";
 
 // The same aerodromes and IPMA stations as web/js/data.js (a test checks it).
-export const ICAOS = ["LPPM", "LPFR", "LPEV", "LPBJ"];
+export const ICAOS = ["LPPM", "LPFR", "LPEV", "LPBJ", "LPSO"];
 export const STATIONS = [
   { icao: "LPPM", station: 878 },
   { icao: "LPEV", station: 843 },
+  { icao: "LPSO", station: 817 },
 ];
 
 // Web pages allowed to read the relay: the app, and a local copy for testing.

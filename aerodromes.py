@@ -10,12 +10,12 @@ using made-up numbers.
 
 For each runway direction add one line to "runways":
     rwy      designator, e.g. "29"
-    bearing  runway direction in degrees from the AIP, for the wind
-             components (None = use the designator x 10). The AIP gives it
-             magnetic; in southern Portugal that is within about 1-2 degrees
-             of true, so a METAR (true) or ATIS (magnetic) wind both work.
+    bearing  runway direction in degrees, for the wind components (None =
+             use the designator x 10). True or magnetic: in southern Portugal
+             they are within about 1-2 degrees, so a METAR (true) or ATIS
+             (magnetic) wind both work.
     tora, toda, asda, lda   declared distances in metres
-    surface  "paved" or "grass"
+    surface  "paved" or "grass" (None = not known yet, worked out as paved)
 """
 
 DEPARTURE = "LPPM"        # every flight starts here
@@ -25,15 +25,16 @@ AERODROMES = {
     "LPPM": {
         "name": "Portimao",
         "nm_from_departure": 0,
-        "elevation_ft": 5,       # 1.47 m, NAV Portugal sunrise/sunset tables 2026
+        # NAV Portugal VFR Manual AD 2-LPPM (20-MAR-2025): elevation 1 m.
+        "elevation_ft": 5,
         "runways": [
-            # RWY 11/29, paved (runway numbers from the IPMA station at the
-            # aerodrome). Heading = designator x 10 until the AIP is in.
-            # Declared distances: AIP AD 2.13, still to add.
-            {"rwy": "11", "bearing": None, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": "paved"},
-            {"rwy": "29", "bearing": None, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": "paved"},
+            # RWY 11/29: 860 x 27 m asphalt, THR 29 displaced 90 m (AD 2.12,
+            # 2.13). True bearing worked out from the threshold coordinates
+            # (published as NOT AVBL).
+            {"rwy": "11", "bearing": 107.5, "tora": 770, "toda": 770,
+             "asda": 860, "lda": 860, "surface": "paved"},
+            {"rwy": "29", "bearing": 287.5, "tora": 860, "toda": 860,
+             "asda": 860, "lda": 770, "surface": "paved"},
         ],
     },
     "LPFR": {
@@ -57,6 +58,21 @@ AERODROMES = {
              "asda": None, "lda": None, "surface": "paved"},
             # RWY 07/25 (sand, 530 x 30 m) is left out: the POH has no
             # performance data for sand.
+        ],
+    },
+    "LPSO": {
+        "name": "Ponte de Sor",
+        "nm_from_departure": 126,
+        # Not in the VFR Manual (it's in the AIP): elevation 119 m from the
+        # IPMA station at the aerodrome (station 817).
+        "elevation_ft": 390,
+        "runways": [
+            # RWY 03/21 as the IPMA station gives them. Surface and declared
+            # distances: AIP AD 2.12 / 2.13, still to add.
+            {"rwy": "03", "bearing": None, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": None},
+            {"rwy": "21", "bearing": None, "tora": None, "toda": None,
+             "asda": None, "lda": None, "surface": None},
         ],
     },
 }

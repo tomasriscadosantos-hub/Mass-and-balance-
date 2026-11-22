@@ -39,7 +39,8 @@ async function awc(kind, ids, extra, ms) {
  * Reads an IPMA automatic aerodrome station file (dataNNN.csv: 10-minute
  * rows, times in UTC, wind in kt at aerodrome stations) and returns the latest
  * row that has a wind: { station, time, qnh, tempC, dewC, dir, kt, maxDir,
- * maxKt, runways }. null if there is no usable row.
+ * maxKt, runways }. null if there is no usable row. IPMA writes -990 for a
+ * reading it doesn't have.
  */
 export function parseIpmaCsv(text) {
   const lines = String(text).trim().split(/\r?\n/);
@@ -54,7 +55,8 @@ export function parseIpmaCsv(text) {
     });
     const num = (key) => {
       const v = row[key];
-      return v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v);
+      if (v === undefined || v === "" || isNaN(Number(v))) return null;
+      return Number(v) <= -990 ? null : Number(v); // -990: missing
     };
     if (num("dd") === null || num("ff") === null || !row.data) continue;
     const rec = {

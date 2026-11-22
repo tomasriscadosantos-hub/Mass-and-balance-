@@ -11,6 +11,26 @@
 
   var CHANGES = [
     {
+      id: 4,
+      date: "2026-11-22",
+      items: [
+        {
+          title: "Portimão runway lengths",
+          text: "From the VFR Manual: RWY 11 TORA 770 m, LDA 860 m; RWY 29 TORA 860 m, LDA 770 m " +
+            "(displaced threshold). Take-off and landing at LPPM are now checked against them.",
+        },
+        {
+          title: "Ponte de Sor (LPSO)",
+          text: "New destination, with its IPMA station's live wind. Its runway lengths aren't in the " +
+            "app yet, so those checks wait for the AIP.",
+        },
+        {
+          title: "Station sensor gaps",
+          text: "When an IPMA station misses a reading, the app now uses its last complete one.",
+        },
+      ],
+    },
+    {
       id: 3,
       date: "2026-11-21",
       items: [

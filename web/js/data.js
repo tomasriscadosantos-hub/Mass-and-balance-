@@ -92,8 +92,8 @@
    *
    * Runways, one entry per direction:
    *   rwy      designator, e.g. "29"
-   *   bearing  runway direction in degrees from the AIP (magnetic; in southern
-   *            Portugal within about 1-2 degrees of true). null = designator x 10
+   *   bearing  runway direction in degrees, true (in southern Portugal magnetic
+   *            is within about 1-2 degrees of it). null = designator x 10
    *   tora, toda, asda, lda   declared distances in metres (AIP AD 2.13)
    *   surface  "paved" or "grass"
    *
@@ -106,17 +106,20 @@
   var AERODROMES = {
     LPPM: {
       name: "Portimão",
-      // NAV Portugal sunrise/sunset tables 2026: 37 08 58N 008 35 02W, elevation 1.47 m.
+      // NAV Portugal VFR Manual AD 2-LPPM (20-MAR-2025): ARP 37 08 58N
+      // 008 35 02W, elevation 1 m (5 ft), MAG VAR 1 W.
       arp: ["37 08 58N", "008 35 02W"],
       elevationFt: 5,
-      source: "NAV Portugal sunrise/sunset tables 2026 (position, elevation); IPMA station 878 (runway numbers); school (paved)",
+      source: "VFR Manual AD 2-LPPM (20-MAR-2025)",
       // IPMA automatic weather station at the aerodrome (wind in kt, every 10 min).
       ipma: { station: 878, page: "https://ema.ipma.pt/afis/portimao-aerodromo/" },
       runways: [
-        // RWY 11/29 as the IPMA station gives them, paved; heading = designator
-        // x 10 until the AIP is in. Declared distances still to add.
-        { rwy: "11", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
-        { rwy: "29", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
+        // RWY 11/29: 860 x 27 m asphalt, PCN 37/F/C/W/T; THR 29 displaced 90 m
+        // (AD 2.12, 2.13). The true bearing is published as NOT AVBL: worked
+        // out from the threshold coordinates (370901.89N 0083518.68W and
+        // 370854.47N 0083449.09W, 764 m apart).
+        { rwy: "11", bearing: 107.5, tora: 770, toda: 770, asda: 860, lda: 860, surface: "paved" },
+        { rwy: "29", bearing: 287.5, tora: 860, toda: 860, asda: 860, lda: 770, surface: "paved" },
       ],
     },
     LPFR: {
@@ -149,6 +152,22 @@
       elevationFt: null,
       source: null,
       runways: [],
+    },
+    // Ponte de Sor: cross-country destination. Not in the VFR Manual (it's in
+    // the AIP, which is offline): position and elevation are those of IPMA's
+    // station at the aerodrome, which for LPPM and LPEV match the ARP.
+    LPSO: {
+      name: "Ponte de Sor",
+      arp: ["39 12 42N", "008 03 28W"], // IPMA station 817; check against the AIP
+      elevationFt: 390, // 119 m, IPMA station 817
+      source: "IPMA station 817 (position, elevation 119 m, runway numbers)",
+      ipma: { station: 817, page: "https://ema.ipma.pt/afis/ponte-de-sor-aerodromo/" },
+      runways: [
+        // RWY 03/21 as the IPMA station gives them; heading = designator x 10.
+        // Surface and declared distances: AIP AD 2.12 / 2.13, still to add.
+        { rwy: "03", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+        { rwy: "21", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+      ],
     },
   };
 
