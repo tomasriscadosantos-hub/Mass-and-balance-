@@ -96,6 +96,9 @@
    *            is within about 1-2 degrees of it). null = designator x 10
    *   toraEnd  where the take-off run ends (a threshold or runway end from AD 2.12),
    *            the reference for the obstacles ahead
+   *   endElevFt  elevation there, where it's lower than the aerodrome (optional)
+   *   slopePct   + uphill, - downhill in that direction (optional; the POH has
+   *              no slope correction, so the app notes it)
    *   tora, toda, asda, lda   declared distances in metres (AIP AD 2.13)
    *   surface  "paved" or "grass"
    *
@@ -239,6 +242,32 @@
         // Position not published, only "DIST 650 M": checked on the extended
         // centre line in both directions.
         { what: "Power lines", elevFt: 440, ahead: { rwy: ["03", "21"], m: 650 } }, // 134 m
+      ],
+    },
+    // Cascais: cross-country destination. AIP Portugal LPCS AD 2.2, 2.10, 2.12,
+    // 2.13 (AIRAC 006-26, 06-AUG-2026). Has a METAR and TAF.
+    LPCS: {
+      name: "Cascais",
+      arp: ["38 43 32N", "009 21 19W"],
+      elevationFt: 326,
+      source: "AIP LPCS AD 2 (AIRAC 006-26)",
+      runways: [
+        // RWY 17/35: 1400 x 30 m asphalt. THR 17 displaced 190 m; TORAs include
+        // 140 m starter extensions. Slopes down to the south: THR 17 99 m,
+        // THR 35 88 m, about 0.9 %. RWY 17's take-off run ends at the low
+        // south end (88 m = 289 ft), the base for its climb-out heights.
+        { rwy: "17", bearing: 164.08, toraEnd: ["38 43 08.41N", "009 21 10.74W"], endElevFt: 289, slopePct: -0.9,
+          tora: 1540, toda: 1645, asda: 1540, lda: 1210, surface: "paved" },
+        { rwy: "35", bearing: 344.08, toraEnd: ["38 43 52.06N", "009 21 26.64W"], slopePct: 0.9,
+          tora: 1480, toda: 1540, asda: 1540, lda: 1400, surface: "paved" },
+      ],
+      obstacleSource: "AIP LPCS AD 2.10 (AIRAC 006-26)",
+      obstacles: [
+        { what: "Antenna", elevFt: 659, pos: ["38 44 53.7N", "009 21 41.1W"] }, // 201 m, 1900 m from the RWY end
+        { what: "Tree (17 m high)", elevFt: 341, pos: ["38 43 06.3N", "009 21 05.3W"] }, // 104 m
+        { what: "Antenna (visibility meter)", elevFt: 335, pos: ["38 43 37.5N", "009 21 18.6W"] }, // 102 m
+        { what: "Antenna", elevFt: 361, pos: ["38 43 37.4N", "009 21 18.3W"] }, // 110 m
+        { what: "Antenna (wind indicator)", elevFt: 344, pos: ["38 43 36.7N", "009 21 18.0W"] }, // 105 m
       ],
     },
   };

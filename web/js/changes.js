@@ -11,6 +11,17 @@
 
   var CHANGES = [
     {
+      id: 7,
+      date: "2026-11-22",
+      items: [
+        {
+          title: "Cascais (LPCS)",
+          text: "New destination, with its runway, obstacles and METAR/TAF from the AIP. Its runway " +
+            "slopes about 0.9 %: the app notes it where the POH distances will be longer.",
+        },
+      ],
+    },
+    {
       id: 6,
       date: "2026-11-22",
       items: [

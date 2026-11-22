@@ -231,6 +231,7 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    | LPEV Évora | AIP AD 2 (AIRAC 008-26) | 807 ft | 01/19, 1300 × 23 asphalt (4.25°/184.25°) | 01: 1260/1300/1300/1245 · 19: 1245/1300/1300/1260 |
    | LPBJ Beja | AIP AD 2 (AIRAC 007-26) | 636 ft | 01L/19R, 3450 × 60 concrete (5.93°/185.93°) | 01L: 3450/3815/3450/3450 · 19R: 3450/4040/3450/3450 |
    | LPSO Ponte de Sor | AIP AD 2 (AIRAC 007-26) | 390 ft | 03/21, 1800 × 30 asphalt (24°/204°*) | both: 1800/1800/1800/1800 |
+   | LPCS Cascais | AIP AD 2 (AIRAC 006-26) | 326 ft | 17/35, 1400 × 30 asphalt (164.08°/344.08°), slopes down to the south about 0.9 % | 17: 1540/1645/1540/1210 · 35: 1480/1540/1540/1400 (TORAs include 140 m starter extensions) |
 
    \* Published as not available: worked out from the threshold coordinates (the same method
    gives Faro's published 100.07° exactly). Left out: Évora's sand runway 07/25 (no POH data for
@@ -245,8 +246,11 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
      not checked.
    - LPFR: AD 2.10 refers to the Type A obstacle chart (AD 2.24.04-1); distances read from the
      chart, about ±50 m.
-   - LPEV (1), LPBJ (11), LPSO (7): with positions. LPSO's power lines have only "DIST 650 M",
-     so they are checked on the extended centre line in both directions.
+   - LPEV (1), LPBJ (11), LPSO (7), LPCS (5): with positions. LPSO's power lines have only
+     "DIST 650 M", so they are checked on the extended centre line in both directions.
+   - LPCS slopes: RWY 17's climb-out heights are measured from its low south end (88 m), and
+     the app notes the slope where the POH distances will be longer (uphill take-off on 35,
+     downhill landing on 17); the POH has no slope correction.
 
    Each runway also has `toraEnd`, where its take-off run ends (a threshold or runway end from
    AD 2.12): the obstacles' distances are measured from there. A test checks that every take-off

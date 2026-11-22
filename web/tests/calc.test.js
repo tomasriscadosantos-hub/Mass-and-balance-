@@ -150,10 +150,11 @@ test("aerodrome data: elevation, declared distances, bearings that fit the runwa
       const off = Math.abs(((r.bearing - parseInt(r.rwy, 10) * 10 + 540) % 360) - 180);
       assert.ok(off <= 10, where + " bearing " + r.bearing + " vs runway number");
       assert.equal(r.surface, "paved", where + " surface");
-      // the take-off run starts about TORA behind its end (the other direction's end)
+      // the take-off run starts about TORA behind its end (the other direction's end;
+      // displaced thresholds and LPCS's 140 m starter extensions make up the rest)
       const other = ad.runways.find((x) => x !== r);
       const back = calc.obstacleOffset(r, { pos: other.toraEnd });
-      assert.ok(Math.abs(back.along + r.tora) <= 100 && Math.abs(back.cross) < 30, where + " toraEnd");
+      assert.ok(Math.abs(back.along + r.tora) <= 150 && Math.abs(back.cross) < 30, where + " toraEnd");
     }
     for (const ob of ad.obstacles) {
       assert.ok(ob.what && (ob.elevFt === null || Number.isFinite(ob.elevFt)), icao + " obstacle " + ob.what);
@@ -276,6 +277,27 @@ test("obstacles: which ones are in the take-off path (90 m + 12.5 %, up to 6 km)
   assert.equal(calc.takeoffObstacles(lppm.runways[0], lppm.obstacles).length, 5);
   assert.equal(calc.takeoffObstacles(lppm.runways[1], lppm.obstacles).length, 0);
   assert.equal(calc.approachObstacles(lppm.runways[1], lppm.runways, lppm.obstacles).length, 5);
+});
+
+test("LPCS: slope notes, and RWY 17's climb-out measured from its low south end", () => {
+  const ad = D.AERODROMES.LPCS;
+  const [r17, r35] = ad.runways;
+  const ac = D.AIRCRAFT["OK-HAD"];
+  const site = (rwy) => ({ icao: "LPCS", elevationFt: ad.elevationFt, rwy,
+    weather: { qnh: 1013, oat: 20, dir: null, kt: 0, gust: null } });
+  const up = calc.runwayCheck(ac, "take-off", site(r35), 0, { rules: "om" });
+  assert.match(up.notes.join(), /RWY 35 slopes up about 0.9 %/);
+  assert.equal(calc.runwayCheck(ac, "landing", site(r35), 0, { rules: "om" }).notes.length, 0);
+  assert.match(calc.runwayCheck(ac, "landing", site(r17), 0, { rules: "om" }).notes.join(), /RWY 17 slopes down/);
+  // the antenna 1.9 km north is under the RWY 35 climb-out
+  const list35 = calc.takeoffObstacles(r35, ad.obstacles);
+  assert.deepEqual(list35.map((o) => o.ob.what), ["Antenna"]);
+  assert.ok(calc.obstacleClearance(ac, site(r35), up, list35).rows[0].ok);
+  // RWY 17: heights from 289 ft (the south end), not the 326 ft aerodrome elevation
+  const down = calc.runwayCheck(ac, "take-off", site(r17), 0, { rules: "om" });
+  const fake = [{ ob: { what: "Test", elevFt: 0 }, along: 0, cross: 0, assumed: false }];
+  const o = calc.obstacleClearance(ac, site(r17), down, fake);
+  near(o.rows[0].altFt, 289 + 50 + (o.ftPerNm / 1852) * (1540 - down.dist), 1e-9, "RWY 17 base");
 });
 
 test("obstacle clearance: 50 ft at the take-off distance, then the POH climb", () => {

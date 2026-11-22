@@ -91,6 +91,19 @@ AERODROMES = {
             {"rwy": "21", "bearing": 204, "tora": 1800, "toda": 1800,
              "asda": 1800, "lda": 1800, "surface": "paved"},
         ],
+    },    # Cascais: AIP Portugal LPCS AD 2 (AIRAC 006-26). RWY 17/35 1400 x 30 m
+    # asphalt, THR 17 displaced 190 m, TORAs include 140 m starter
+    # extensions; slopes down to the south about 0.9 % (no POH correction).
+    "LPCS": {
+        "name": "Cascais",
+        "nm_from_departure": 101,
+        "elevation_ft": 326,          # 99.32 m
+        "runways": [
+            {"rwy": "17", "bearing": 164.08, "tora": 1540, "toda": 1645,
+             "asda": 1540, "lda": 1210, "surface": "paved"},
+            {"rwy": "35", "bearing": 344.08, "tora": 1480, "toda": 1540,
+             "asda": 1540, "lda": 1400, "surface": "paved"},
+        ],
     },
 }
 

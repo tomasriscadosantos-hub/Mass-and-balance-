@@ -545,6 +545,17 @@
     if (!noRunway && !known(rwy.surface)) {
       result.notes.push("runway surface not in the data yet: worked out as paved (no grass correction)");
     }
+    // The POH has no slope correction: say so where the slope makes it longer.
+    if (!noRunway && known(rwy.slopePct)) {
+      var pct = Math.abs(rwy.slopePct).toFixed(1);
+      if (isTakeoff && rwy.slopePct > 0) {
+        result.notes.push("RWY " + rwy.rwy + " slopes up about " + pct + " %: the POH has no slope correction, " +
+          "so the take-off distance will be longer (UK CAA guidance: about 5 % per 1 % of slope)");
+      } else if (!isTakeoff && rwy.slopePct < 0) {
+        result.notes.push("RWY " + rwy.rwy + " slopes down about " + pct + " %: the POH has no slope correction, " +
+          "so the landing distance will be longer (UK CAA guidance: about 5 % per 1 % of slope)");
+      }
+    }
     return result;
   }
 
@@ -779,7 +790,8 @@
       if (known(o.ob.elevFt)) {
         var fromStart = tora + o.along;
         var h = fromStart >= report.dist ? 50 + grad * (fromStart - report.dist) : (50 * fromStart) / report.dist;
-        var alt = site.elevationFt + h;
+        // heights from the far end of the take-off run where it's lower (a sloping runway)
+        var alt = (known(report.rwy.endElevFt) ? report.rwy.endElevFt : site.elevationFt) + h;
         if (known(limitFt) && alt > limitFt) {
           alt = limitFt;
           row.limited = true;
