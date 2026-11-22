@@ -1122,8 +1122,39 @@
 
   var wx = { data: null, error: "", status: "", loading: false, filled: {} };
 
-  // weather.json is published with the app by the deploy workflow (normally
-  // every 15 min). manual: the Refresh button, which says what it found.
+  function getJson(url, ms) {
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, ms) : null;
+    return fetch(url, { cache: "no-store", signal: ctrl ? ctrl.signal : undefined }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function (data) {
+      clearTimeout(timer);
+      return data;
+    }, function (e) {
+      clearTimeout(timer);
+      throw e;
+    });
+  }
+
+  // Live weather from the relay, with anything it couldn't get (or all of it,
+  // if the relay can't be reached) taken from the copy published with the app.
+  function mergeWeather(live, copy) {
+    if (!live) return copy ? Object.assign({}, copy, { live: false }) : null;
+    var out = Object.assign({}, live, { live: true });
+    if (copy) {
+      ["metars", "tafs", "stations"].forEach(function (key) {
+        (copy[key] || []).forEach(function (r) {
+          if (!reportFor(out[key], r.icao)) out[key] = (out[key] || []).concat([r]);
+        });
+      });
+    }
+    return out;
+  }
+
+  // The relay (worker/) fetches the weather live when asked; weather.json is
+  // the copy published with the app by the deploy workflow. manual: the
+  // Refresh button, which says what it found.
   function loadWeather(manual) {
     if (wx.loading) return;
     var before = wx.data && wx.data.fetched;
@@ -1133,31 +1164,38 @@
     btn.disabled = true;
     btn.textContent = "Checking…";
     renderBriefing();
-    fetch("weather.json?t=" + Date.now(), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        wx.data = data;
-        var errors = data.errors || (data.error ? [data.error] : []);
-        wx.error = errors.length ? "Part of the weather didn't download at the last update; what's missing is not shown." : "";
-        if (manual) {
-          wx.status = data.fetched === before
-            ? "Nothing newer on the server yet. For the wind right now, use Live wind on IPMA."
-            : "Updated.";
-        }
-      })
-      .catch(function () {
+    var none = function () {
+      return null;
+    };
+    Promise.all([
+      D.WEATHER_RELAY ? getJson(D.WEATHER_RELAY, 30000).catch(none) : null,
+      getJson("weather.json?t=" + Date.now(), 15000).catch(none),
+    ]).then(function (got) {
+      var data = mergeWeather(got[0], got[1]);
+      if (!data) {
         if (wx.data) wx.status = "Couldn't check for newer weather. Is there signal?";
         else wx.error = "No weather here. It needs signal and the installed app (not the preview).";
-      })
-      .then(function () {
-        wx.loading = false;
-        btn.disabled = false;
-        btn.textContent = "Refresh";
-        renderBriefing();
-      });
+        return;
+      }
+      wx.data = data;
+      var errors = data.errors || (data.error ? [data.error] : []);
+      wx.error = errors.length
+        ? (data.live
+          ? "Part of the weather didn't download just now. Older reports from the app's copy are shown where there are any."
+          : "Part of the weather didn't download at the last update; what's missing is not shown.")
+        : "";
+      if (manual) {
+        if (data.live) wx.status = "Updated with live weather.";
+        else if (data.fetched === before) {
+          wx.status = "Nothing newer on the server yet. For the wind right now, use Live wind on IPMA.";
+        } else wx.status = "Updated.";
+      }
+    }).then(function () {
+      wx.loading = false;
+      btn.disabled = false;
+      btn.textContent = "Refresh";
+      renderBriefing();
+    });
   }
 
   function routeAerodromes() {
@@ -1210,8 +1248,8 @@
     }
     var html = "";
     if (wx.data.fetched) {
-      html += '<div class="wx-updated"><span>Weather downloaded for the app</span>' +
-        ageChip(wx.data.fetched, 30) + "</div>";
+      html += '<div class="wx-updated"><span>' + (wx.data.live ? "Live weather, downloaded" :
+        "Weather downloaded for the app") + "</span>" + ageChip(wx.data.fetched, 30) + "</div>";
     }
     if (wx.status) html += '<p class="hint wx-status" role="status">' + esc(wx.status) + "</p>";
     if (wx.error) html += '<p class="missing">' + esc(wx.error) + "</p>";

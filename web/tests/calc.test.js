@@ -320,21 +320,3 @@ test("METAR reader", () => {
   const mps = calc.parseMetar("METAR XXXX 211600Z 18010MPS 9999 NSC 15/10 A2992");
   assert.deepEqual([mps.wind.kt, mps.ceilFt, mps.qnh], [19, Infinity, 1013]);
 });
-
-test("IPMA aerodrome station file (ema.ipma.pt)", () => {
-  const csv = [
-    "estacao,data,pressao,pnmm,deltap,qfe,qnh,tar,tdew,hrel,dd,ff,ddx,ffx,rwy1,rwy2,h1,c1,h2,c2,prec,precdia,tmax,tmin,ventoaero",
-    "878,2026-11-21 16:00:00,1017.3,1017.4,-1.0,1017.4,1017,19.4,17.0,86,217,4,204,9,11,29,T01,R04,H01,L04,0.0,0.0,20.4,11.5,&value=||| &deg;",
-    "878,2026-11-21 16:10:00,1017.3,1017.4,-0.9,1017.4,1017,19.3,17.3,88,216,5,224,9,11,29,T01,R05,H01,L05,0.0,0.0,20.4,11.5,&value=205|215 &deg;",
-    "878,2026-11-21 16:20:00,1017.2,,,,,,,,,,,,11,29,,,,,,,,,",
-  ].join("\n");
-  const r = calc.parseIpmaCsv(csv);
-  assert.equal(r.station, "878");
-  assert.equal(r.time, "2026-11-21T16:10:00Z"); // the empty 16:20 row is skipped
-  assert.deepEqual([r.qnh, r.tempC, r.dir, r.kt, r.maxDir, r.maxKt], [1017, 19.3, 216, 5, 224, 9]);
-  assert.deepEqual(r.runways, ["11", "29"]);
-  const evora = calc.parseIpmaCsv(csv.split("\n")[0] + "\n" +
-    "843,2026-11-21 16:10:00,986.9,1015.7,-1.2,987.1,1016,16.8,16.6,99,198,12,197,15,1,19,T12,L02,H12,R02,0.0,1.4,17.8,12.5,x");
-  assert.deepEqual(evora.runways, ["01", "19"]);
-  assert.equal(calc.parseIpmaCsv("estacao,data\n"), null);
-});

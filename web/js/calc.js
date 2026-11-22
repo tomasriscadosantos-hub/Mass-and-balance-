@@ -597,47 +597,6 @@
     return out;
   }
 
-  /*
-   * Reads an IPMA automatic aerodrome station file (ema.ipma.pt, dataNNN.csv:
-   * 10-minute rows, times in UTC, wind in kt at aerodrome stations) and returns
-   * the latest row that has a wind: { station, time, qnh, tempC, dewC, dir, kt,
-   * maxDir, maxKt, runways }. null if there is no usable row.
-   */
-  function parseIpmaCsv(text) {
-    var lines = String(text).trim().split(/\r?\n/);
-    if (lines.length < 2) return null;
-    var head = lines[0].split(",");
-    var latest = null;
-    for (var i = 1; i < lines.length; i++) {
-      var cells = lines[i].split(",");
-      var row = {};
-      head.forEach(function (h, k) {
-        row[h] = cells[k];
-      });
-      var num = function (key) {
-        var v = row[key];
-        return v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v);
-      };
-      if (num("dd") === null || num("ff") === null || !row.data) continue;
-      var rec = {
-        station: row.estacao,
-        time: row.data.replace(" ", "T") + "Z",
-        qnh: num("qnh"),
-        tempC: num("tar"),
-        dewC: num("tdew"),
-        dir: num("dd"),
-        kt: num("ff"),
-        maxDir: num("ddx"),
-        maxKt: num("ffx"),
-        runways: [row.rwy1, row.rwy2].filter(Boolean).map(function (r) {
-          return String(r).padStart(2, "0");
-        }),
-      };
-      if (!latest || rec.time > latest.time) latest = rec;
-    }
-    return latest;
-  }
-
   // OM C 5: visibility (km) and ceiling (ft AGL, Infinity = none) against the
   // student solo minima, local (aerodrome) or cross-country.
   function minimaCheck(crossCountry, visKm, ceilFt) {
@@ -785,7 +744,6 @@
     climbCheck: climbCheck,
     minimaCheck: minimaCheck,
     parseMetar: parseMetar,
-    parseIpmaCsv: parseIpmaCsv,
     sunTimes: sunTimes,
     sunsetUtcMin: sunsetUtcMin,
     daylight: daylight,

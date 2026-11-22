@@ -9,7 +9,7 @@ name: Deploy web app
 on:
   push:
     branches: [claude/eager-brahmagupta-cii6jq, main]
-    paths: ["web/**", ".github/scripts/**", ".github/workflows/pages.yml"]
+    paths: ["web/**", "worker/**", ".github/scripts/**", ".github/workflows/pages.yml"]
   schedule:
     - cron: "4,19,34,49 * * * *" # IPMA stations every 10 min, METARs every 30
   workflow_dispatch:

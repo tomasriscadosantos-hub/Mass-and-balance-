@@ -101,6 +101,16 @@ them directly. In the app, the Weather and NOTAMs panel shows each report with i
 
 None of this replaces the official briefing.
 
+**Live weather relay.** GitHub's scheduled runs are often late or skipped, so `weather.json` can be
+old. `worker/` is a small Cloudflare Worker (free plan) that downloads the same weather live when
+the app asks, reusing a copy for up to a minute. The app asks the relay first and fills in anything
+missing from `weather.json`; with no relay set, or when it can't be reached, it uses `weather.json`
+alone. `worker/weather.mjs` is the download itself, shared with the deploy workflow. To deploy or
+update the relay: `CLOUDFLARE_API_TOKEN=... worker/deploy.sh` (an API token made with Cloudflare's
+"Edit Cloudflare Workers" template), then put the address it prints in `WEATHER_RELAY` in
+`web/js/data.js`. If the relay's aerodromes change, update `ICAOS` and `STATIONS` in
+`worker/index.mjs` too (a test checks they match `data.js`).
+
 **What's new.** After an update the app shows, once, a note with what changed; "What's new" at the
 bottom of the page opens it again. The notes are in `web/js/changes.js`. When publishing a change,
 add an entry at the top with the next id, and bump `VERSION` in `web/sw.js`.

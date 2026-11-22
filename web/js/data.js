@@ -162,6 +162,9 @@
     FUEL_LB_PER_GAL: 6.0, // AVGAS, as used in the POH
     FINAL_RESERVE_MIN: 45, // OM C 2.1.3: final reserve, VFR day
     APPROACH_MIN: 10, // OM C 2.1.2-2.1.3: approach and landing, VFR, added to trip and alternate fuel
+    // Live weather relay (worker/, on Cloudflare). Empty: the app uses only the
+    // copy published with it (weather.json).
+    WEATHER_RELAY: "",
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = MB.data;
