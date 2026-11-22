@@ -237,6 +237,21 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
    sand) and Beja's 01R/19L (taxiing only). The data is in `web/js/data.js` and in
    `aerodromes.py`; check it again every AIRAC cycle.
 
+   **Obstacles** (web app only), from AD 2.10:
+   - LPPM: 5 obstacles under the RWY 29 approach, so under the RWY 11 climb-out. No positions
+     are published, so they are placed on the extended centre line, with distances from THR 29
+     (the end of RWY 11's take-off run). That is up to 90 m closer than from the runway end,
+     so on the safe side. The water reservoir has no published elevation, so it is listed but
+     not checked.
+   - LPFR: AD 2.10 refers to the Type A obstacle chart (AD 2.24.04-1); distances read from the
+     chart, about ±50 m.
+   - LPEV (1), LPBJ (11), LPSO (7): with positions. LPSO's power lines have only "DIST 650 M",
+     so they are checked on the extended centre line in both directions.
+
+   Each runway also has `toraEnd`, where its take-off run ends (a threshold or runway end from
+   AD 2.12): the obstacles' distances are measured from there. A test checks that every take-off
+   run starts within 100 m of where its TORA says.
+
 Also check the arms, limits, fuel capacity and planning fuel flow against each aircraft's own
 POH and the school's procedures. To add another alternate, add it to `AERODROMES` with its
 distance from LPPM, and its ICAO code to `ALTERNATES`, both in `aerodromes.py`.

@@ -94,8 +94,18 @@
    *   rwy      designator, e.g. "29"
    *   bearing  runway direction in degrees, true (in southern Portugal magnetic
    *            is within about 1-2 degrees of it). null = designator x 10
+   *   toraEnd  where the take-off run ends (a threshold or runway end from AD 2.12),
+   *            the reference for the obstacles ahead
    *   tora, toda, asda, lda   declared distances in metres (AIP AD 2.13)
    *   surface  "paved" or "grass"
+   *
+   * Obstacles (AIP AD 2.10), elevations in ft (converted from m where the
+   * AIP gives metres), either
+   *   pos: [lat, lon]                  where the AIP gives the position, or
+   *   ahead: { rwy, m, cross }         m metres beyond the end of that runway's
+   *                                    take-off run (rwy can be a list), cross
+   *                                    metres right (+) or left (-), 0 if not given
+   * elevFt null: elevation not published (listed, not checked).
    *
    * arp: aerodrome reference point as in the AIP, used for the distance to the
    * alternate and the sunrise/sunset times.
@@ -118,8 +128,20 @@
         // (AD 2.12, 2.13). The true bearing is published as NOT AVBL: worked
         // out from the threshold coordinates (370901.89N 0083518.68W and
         // 370854.47N 0083449.09W, 764 m apart).
-        { rwy: "11", bearing: 107.5, tora: 770, toda: 770, asda: 860, lda: 860, surface: "paved" },
-        { rwy: "29", bearing: 287.5, tora: 860, toda: 860, asda: 860, lda: 770, surface: "paved" },
+        { rwy: "11", bearing: 107.5, toraEnd: ["37 08 54.47N", "008 34 49.09W"], tora: 770, toda: 770, asda: 860, lda: 860, surface: "paved" },
+        { rwy: "29", bearing: 287.5, toraEnd: ["37 09 01.89N", "008 35 18.68W"], tora: 860, toda: 860, asda: 860, lda: 770, surface: "paved" },
+      ],
+      obstacleSource: "VFR Manual AD 2-LPPM AD 2.10 (20-MAR-2025): positions not published, distances taken from THR 29",
+      // AD 2.10: all in the RWY 29 approach, so under the RWY 11 climb-out,
+      // without positions. Their distances are taken from THR 29, the end of
+      // RWY 11's take-off run: up to 90 m closer than from the runway end, so
+      // on the safe side. Assumed on the extended centre line.
+      obstacles: [
+        { what: "Fence", elevFt: 7, ahead: { rwy: "11", m: 27 } }, // 2 m
+        { what: "Embankment", elevFt: 11, ahead: { rwy: "11", m: 100 } }, // 3.3 m
+        { what: "Buildings", elevFt: 102, ahead: { rwy: "11", m: 390 } }, // 31 m
+        { what: "Natural high point", elevFt: 164, ahead: { rwy: "11", m: 700 } }, // 50 m
+        { what: "Water reservoir (Bemposta)", elevFt: null, ahead: { rwy: "11", m: 1310 } },
       ],
     },
     // Faro: AIP Portugal LPFR AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
@@ -131,8 +153,17 @@
       runways: [
         // RWY 10/28: 2490 x 45 m asphalt, THR displaced 45 m at both ends,
         // CWY 155 m.
-        { rwy: "10", bearing: 100.07, tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
-        { rwy: "28", bearing: 280.07, tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
+        { rwy: "10", bearing: 100.07, toraEnd: ["37 00 48.15N", "007 57 30.66W"], tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
+        { rwy: "28", bearing: 280.07, toraEnd: ["37 01 02.27N", "007 59 10.11W"], tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
+      ],
+      obstacleSource: "AIP Type A obstacle chart LPFR AD 2.24.04-1 (AIRAC 002-24): distances read from the chart, about ±50 m",
+      // AD 2.10 refers to the Type A obstacle chart (AD 2.24.04-1, AIRAC
+      // 002-24); distances read from its scale, about +/- 50 m.
+      obstacles: [
+        { what: "Mast or antenna", elevFt: 28, ahead: { rwy: "10", m: 210 } }, // 8.5 m
+        { what: "Building", elevFt: 95, ahead: { rwy: "10", m: 2180, cross: -200 } }, // 29 m
+        { what: "Mast or antenna", elevFt: 138, ahead: { rwy: "10", m: 2430, cross: -340 } }, // 42 m
+        { what: "Mast or antenna", elevFt: 33, ahead: { rwy: "28", m: 160 } }, // 10 m
       ],
     },
     // Évora: AIP Portugal LPEV AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
@@ -144,9 +175,13 @@
       ipma: { station: 843, page: "https://ema.ipma.pt/afis/evora-aerodromo/" },
       runways: [
         // RWY 01/19: 1300 x 23 m asphalt, THR 01 displaced 54 m, THR 19 40 m.
-        { rwy: "01", bearing: 4.25, tora: 1260, toda: 1300, asda: 1300, lda: 1245, surface: "paved" },
-        { rwy: "19", bearing: 184.25, tora: 1245, toda: 1300, asda: 1300, lda: 1260, surface: "paved" },
+        { rwy: "01", bearing: 4.25, toraEnd: ["38 32 20.38N", "007 53 21.04W"], tora: 1260, toda: 1300, asda: 1300, lda: 1245, surface: "paved" },
+        { rwy: "19", bearing: 184.25, toraEnd: ["38 31 41.39N", "007 53 24.73W"], tora: 1245, toda: 1300, asda: 1300, lda: 1260, surface: "paved" },
         // RWY 07/25 (sand, 530 x 30 m) left out: no POH data for sand.
+      ],
+      obstacleSource: "AIP LPEV AD 2.10 (AIRAC 008-26)",
+      obstacles: [
+        { what: "Tower (10 m high)", elevFt: 837, pos: ["38 31 46.6N", "007 53 29.8W"] }, // 255 m
       ],
     },
     // Beja: on the OM C training routes (LPPM-LPBJ-LPEV-LPPM, LPPM-LPBJ-LPFR-LPPM).
@@ -160,8 +195,22 @@
         // RWY 01L/19R: 3450 x 60 m concrete, slippery when wet. Full-length
         // declared distances (the AIP also gives intersection departures).
         // RWY 01R/19L: taxiing only, left out.
-        { rwy: "01L", bearing: 5.93, tora: 3450, toda: 3815, asda: 3450, lda: 3450, surface: "paved" },
-        { rwy: "19R", bearing: 185.93, tora: 3450, toda: 4040, asda: 3450, lda: 3450, surface: "paved" },
+        { rwy: "01L", bearing: 5.93, toraEnd: ["38 05 39.70N", "007 55 49.30W"], tora: 3450, toda: 3815, asda: 3450, lda: 3450, surface: "paved" },
+        { rwy: "19R", bearing: 185.93, toraEnd: ["38 03 48.41N", "007 56 03.93W"], tora: 3450, toda: 4040, asda: 3450, lda: 3450, surface: "paved" },
+      ],
+      obstacleSource: "AIP LPBJ AD 2.10 (AIRAC 008-26)",
+      obstacles: [
+        { what: "Natural high point", elevFt: 712, pos: ["38 00 01.0N", "007 56 12.1W"] }, // LPBJ 01
+        { what: "Tower", elevFt: 735, pos: ["38 04 37.6N", "007 54 47.6W"] }, // LPBJ 02
+        { what: "Natural high point", elevFt: 634, pos: ["38 06 47.3N", "007 55 47.3W"] }, // LPBJ 03
+        { what: "Natural high point", elevFt: 703, pos: ["38 06 51.7N", "007 56 13.0W"] }, // LPBJ 04
+        { what: "Antenna (wind sensor)", elevFt: 663, pos: ["38 03 52N", "007 55 58W"] }, // LPBJ 05
+        { what: "Antenna (wind sensor)", elevFt: 647, pos: ["38 04 41N", "007 55 53W"] }, // LPBJ 06
+        { what: "Antenna (wind sensor)", elevFt: 653, pos: ["38 04 45N", "007 56 03W"] }, // LPBJ 07
+        { what: "Mast", elevFt: 639, pos: ["38 03 48N", "007 56 13W"] }, // LPBJ 08
+        { what: "Silo", elevFt: 1005, pos: ["38 01 55N", "007 52 15W"] }, // LPBJ 09
+        { what: "Antenna", elevFt: 1122, pos: ["38 00 41N", "007 51 57W"] }, // LPBJ 10
+        { what: "Antenna (wind sensor)", elevFt: 630, pos: ["38 05 35N", "007 55 44W"] }, // LPBJ 11
       ],
     },
     // Ponte de Sor: cross-country destination. AIP Portugal LPSO AD 2.2, 2.12,
@@ -176,8 +225,20 @@
         // RWY 03/21: 1800 x 30 m asphalt. The true bearing is published as
         // NIL: worked out from the threshold coordinates (391215.60N
         // 0080342.92W and 391308.87N 0080312.29W, 1801 m apart).
-        { rwy: "03", bearing: 24, tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
-        { rwy: "21", bearing: 204, tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
+        { rwy: "03", bearing: 24, toraEnd: ["39 13 08.87N", "008 03 12.29W"], tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
+        { rwy: "21", bearing: 204, toraEnd: ["39 12 15.60N", "008 03 42.92W"], tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
+      ],
+      obstacleSource: "AIP LPSO AD 2.10 (AIRAC 007-26)",
+      obstacles: [
+        { what: "Antenna (glide path)", elevFt: 440, pos: ["39 12 57.8N", "008 03 13.6W"] }, // 134 m
+        { what: "Antenna", elevFt: 906, pos: ["39 18 34.2N", "007 59 32.2W"] }, // 276 m
+        { what: "Antenna", elevFt: 787, pos: ["39 17 30.5N", "008 00 18.9W"] }, // 240 m
+        { what: "Antenna", elevFt: 564, pos: ["39 15 22.2N", "008 02 12.5W"] }, // 172 m
+        { what: "Tree", elevFt: 453, pos: ["39 13 31.7N", "008 02 59.4W"] }, // 138 m
+        { what: "Tree", elevFt: 591, pos: ["39 13 54.6N", "008 03 43.9W"] }, // 180 m
+        // Position not published, only "DIST 650 M": checked on the extended
+        // centre line in both directions.
+        { what: "Power lines", elevFt: 440, ahead: { rwy: ["03", "21"], m: 650 } }, // 134 m
       ],
     },
   };

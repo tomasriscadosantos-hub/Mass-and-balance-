@@ -51,6 +51,15 @@
     LDA_FRACTION: 0.7,
     GRASS_TAKEOFF: 0.15,
     GRASS_LANDING: 0.45,
+    M_PER_NM: 1852,
+    // Obstacles: the take-off flight path area as in EASA's aeroplane
+    // performance rules: 90 m either side at the end of the take-off run,
+    // widening by 12.5 % of the distance, at most 900 m; looked at out to 6 km.
+    OBST_HALF_WIDTH_M: 90,
+    OBST_SPLAY: 0.125,
+    OBST_MAX_HALF_WIDTH_M: 900,
+    OBST_RANGE_M: 6000,
+    OBST_MARGIN_FT: 50, // less than this above an obstacle: a note
   };
 
   // false: interpolate between table values (more exact).
@@ -683,43 +692,116 @@
    * Max rate of climb after take-off and the optional obstacle clearance.
    * obstacle: { nm, elevationFt, limitFt (or null), gs }
    */
-  function climbCheck(ac, site, obstacle) {
-    var pa = pressureAltitude(site.elevationFt, site.weather.qnh);
-    var c = climb(ac.perf, pa, site.weather.oat);
-    var result = { climb: c, problems: [] };
-    if (!c) {
-      if (obstacle) result.problems.push("climb " + site.icao + ": outside the POH table");
-      return result;
+  // ------------------------------------------------------------ obstacles
+
+  /*
+   * Where an obstacle is for a take-off on rwy: along = metres beyond the end
+   * of the take-off run (negative: behind it), cross = metres right (+) or
+   * left (-) of the extended centre line, assumed = the AIP gives no position.
+   * null if the obstacle is given for another runway only.
+   */
+  function obstacleOffset(rwy, ob) {
+    if (ob.ahead) {
+      var rwys = [].concat(ob.ahead.rwy);
+      if (rwys.indexOf(rwy.rwy) < 0) return null;
+      return { along: ob.ahead.m, cross: ob.ahead.cross || 0, assumed: !ob.ahead.cross };
     }
-    if (!obstacle) return result;
-    var minutes = (obstacle.nm / obstacle.gs) * 60;
-    var climbFt = c[1] * minutes;
-    var reach = site.elevationFt + climbFt;
-    var crossAt = reach;
-    var limited = false;
-    if (known(obstacle.limitFt) && reach > obstacle.limitFt) {
-      crossAt = obstacle.limitFt;
-      limited = true;
-    }
-    var clearance = crossAt - obstacle.elevationFt;
-    result.obstacle = {
-      nm: obstacle.nm,
-      elevationFt: obstacle.elevationFt,
-      limitFt: obstacle.limitFt,
-      gs: obstacle.gs,
-      minutes: minutes,
-      climbFt: climbFt,
-      reach: reach,
-      crossAt: crossAt,
-      limited: limited,
-      clearance: clearance,
-      ok: clearance > 0,
+    if (!ob.pos || !rwy.toraEnd) return null;
+    var lat0 = parseDms(rwy.toraEnd[0]), lon0 = parseDms(rwy.toraEnd[1]);
+    var north = (parseDms(ob.pos[0]) - lat0) * 111132;
+    var east = (parseDms(ob.pos[1]) - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+    var b = (runwayBearing(rwy) * Math.PI) / 180;
+    return {
+      along: east * Math.sin(b) + north * Math.cos(b),
+      cross: east * Math.cos(b) - north * Math.sin(b),
+      assumed: false,
     };
-    if (clearance <= 0) {
-      result.problems.push("obstacle after take-off " + site.icao + ": clearance " +
-        clearance.toFixed(0) + " ft");
-    }
-    return result;
+  }
+
+  // Distance (m) and true bearing (degrees) of a position from the aerodrome
+  // reference point.
+  function fromArp(ad, pos) {
+    var lat0 = parseDms(ad.arp[0]), lon0 = parseDms(ad.arp[1]);
+    var north = (parseDms(pos[0]) - lat0) * 111132;
+    var east = (parseDms(pos[1]) - lon0) * 111320 * Math.cos((lat0 * Math.PI) / 180);
+    return { m: Math.sqrt(north * north + east * east),
+      brg: ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360 };
+  }
+
+  function inTakeoffPath(off) {
+    if (!off || off.along <= 0 || off.along > C.OBST_RANGE_M) return false;
+    var half = Math.min(C.OBST_HALF_WIDTH_M + C.OBST_SPLAY * off.along, C.OBST_MAX_HALF_WIDTH_M);
+    return Math.abs(off.cross) <= half;
+  }
+
+  // The obstacles in the take-off path of rwy, nearest first.
+  function takeoffObstacles(rwy, obstacles) {
+    return (obstacles || []).map(function (ob) {
+      var off = obstacleOffset(rwy, ob);
+      return off && inTakeoffPath(off) ? { ob: ob, along: off.along, cross: off.cross, assumed: off.assumed } : null;
+    }).filter(Boolean).sort(function (a, b) {
+      return a.along - b.along;
+    });
+  }
+
+  // The obstacles under the approach to rwy: those in the take-off path of
+  // the opposite direction, measured from the end of its take-off run.
+  function approachObstacles(rwy, runways, obstacles) {
+    var opposite = (runways || []).filter(function (r) {
+      var d = Math.abs(((runwayBearing(r) - runwayBearing(rwy) + 540) % 360) - 180);
+      return d > 170;
+    })[0];
+    return opposite ? takeoffObstacles(opposite, obstacles) : [];
+  }
+
+  /*
+   * Clearance over the obstacles after a take-off (report from runwayCheck):
+   * 50 ft at the end of the POH take-off distance (with the wind, not
+   * factored), then the POH best rate of climb at the climb speed, the true
+   * airspeed about 2 % above it per 1000 ft of density altitude, less the
+   * headwind. list from takeoffObstacles; limitFt caps the altitude.
+   */
+  function obstacleClearance(ac, site, report, list, limitFt) {
+    var c = climb(ac.perf, report.pa, site.weather.oat);
+    var out = { climb: c, rows: [], problems: [], notes: [] };
+    if (!c || report.outside || report.noRunway || !known(report.rwy.tora)) return out;
+    var tas = c[0] * (1 + (0.02 * Math.max(report.da, 0)) / 1000);
+    var gs = Math.max(tas - report.head, 20);
+    var grad = c[1] / ((gs * C.M_PER_NM) / 60); // ft per metre
+    var tora = report.rwy.tora;
+    var where = "take-off " + site.icao + " RWY " + report.rwy.rwy;
+    out.tas = tas;
+    out.gs = gs;
+    out.ftPerNm = grad * C.M_PER_NM;
+    list.forEach(function (o) {
+      var row = { what: o.ob.what, elevFt: o.ob.elevFt, along: o.along, cross: o.cross, assumed: o.assumed,
+        manual: !!o.ob.manual };
+      if (known(o.ob.elevFt)) {
+        var fromStart = tora + o.along;
+        var h = fromStart >= report.dist ? 50 + grad * (fromStart - report.dist) : (50 * fromStart) / report.dist;
+        var alt = site.elevationFt + h;
+        if (known(limitFt) && alt > limitFt) {
+          alt = limitFt;
+          row.limited = true;
+        }
+        row.altFt = alt;
+        row.clearance = alt - o.ob.elevFt;
+        row.ok = row.clearance > 0;
+        var name = o.ob.what + " (" + Math.round(o.ob.elevFt) + " ft) " + Math.round(o.along) + " m beyond the runway";
+        if (!row.ok) out.problems.push(where + ": " + name + " not cleared (" + Math.round(row.clearance) + " ft)");
+        else if (row.clearance < C.OBST_MARGIN_FT) {
+          out.notes.push(where + ": " + name + " cleared by only " + Math.round(row.clearance) + " ft");
+        }
+      }
+      out.rows.push(row);
+    });
+    return out;
+  }
+
+  // Best rate of climb at the departure (POH, maximum weight).
+  function climbCheck(ac, site) {
+    var pa = pressureAltitude(site.elevationFt, site.weather.qnh);
+    return { climb: climb(ac.perf, pa, site.weather.oat), problems: [] };
   }
 
   MB.calc = {
@@ -742,6 +824,11 @@
     bestRunway: bestRunway,
     runwayCheck: runwayCheck,
     climbCheck: climbCheck,
+    obstacleOffset: obstacleOffset,
+    fromArp: fromArp,
+    takeoffObstacles: takeoffObstacles,
+    approachObstacles: approachObstacles,
+    obstacleClearance: obstacleClearance,
     minimaCheck: minimaCheck,
     parseMetar: parseMetar,
     sunTimes: sunTimes,

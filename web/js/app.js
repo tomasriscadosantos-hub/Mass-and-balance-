@@ -230,12 +230,12 @@
       }).join("");
       var obstacle = icao !== DEP ? "" :
         '<div class="obstacle" id="obstacle">' +
-        '<label class="checkbox"><input type="checkbox" id="obs-on"> Check an obstacle after take-off</label>' +
+        '<label class="checkbox"><input type="checkbox" id="obs-on"> Add an obstacle (e.g. from a NOTAM) or an ' +
+        "altitude limit</label>" +
         '<div class="wx" id="obs-fields">' +
-        wxField("obs", "nm", "Distance", "NM", "decimal") +
-        wxField("obs", "elev", "Obstacle elevation", "ft", "numeric") +
+        wxField("obs", "nm", "Beyond the runway", "NM", "decimal", "none") +
+        wxField("obs", "elev", "Obstacle elevation", "ft", "numeric", "none") +
         wxField("obs", "limit", "Altitude limit", "ft", "numeric", "none") +
-        wxField("obs", "gs", "Climb ground speed", "kt", "numeric") +
         '</div><p class="error" id="err-obs" hidden></p></div>';
       el.innerHTML =
         '<div class="aerodrome-head"><div class="aerodrome-name"><span class="icao">' + icao + "</span>" +
@@ -297,7 +297,7 @@
       state.obstacle.on = on.checked;
       changed();
     });
-    ["nm", "elev", "limit", "gs"].forEach(function (key) {
+    ["nm", "elev", "limit"].forEach(function (key) {
       var input = $(key + "-obs");
       input.value = state.obstacle[key];
       input.addEventListener("input", function () {
@@ -408,7 +408,7 @@
       $("cont-" + icao).checked = !!state.wx[icao].contaminated;
     });
     $("obs-on").checked = state.obstacle.on;
-    ["nm", "elev", "limit", "gs"].forEach(function (key) {
+    ["nm", "elev", "limit"].forEach(function (key) {
       $(key + "-obs").value = state.obstacle[key];
     });
   }
@@ -656,6 +656,27 @@
       card.pa = calc.pressureAltitude(ad.elevationFt, wx.qnh);
     });
 
+    // Your own obstacle (e.g. from a NOTAM) and altitude limit at the departure.
+    var manual = null;
+    var limit = null;
+    var obstacleError = "";
+    var so = state.obstacle;
+    if (so.on) {
+      var nm = parse(so.nm), elev = parse(so.elev);
+      limit = parse(so.limit);
+      if ((nm === null) !== (elev === null)) {
+        obstacleError = "Enter both the distance and the elevation of the obstacle.";
+      } else if ((nm !== null && (isNaN(nm) || nm <= 0)) || (elev !== null && isNaN(elev)) ||
+                 (limit !== null && isNaN(limit))) {
+        obstacleError = "Enter numbers: distance in NM, heights in ft.";
+      } else if (nm !== null) {
+        manual = { ob: { what: "Your obstacle", elevFt: elev, manual: true }, along: nm * calc.C.M_PER_NM,
+          cross: 0, assumed: false };
+      }
+      if (limit !== null && isNaN(limit)) limit = null;
+    }
+    if (out.cards[DEP]) out.cards[DEP].obstacleError = obstacleError;
+
     var m = mb.byName;
     [
       ["take-off", DEP, m.TOM.lb, "Take-off"],
@@ -681,30 +702,27 @@
           ? ": runways not in the data yet, wind and runway length not checked"
           : ": declared distances not in the data yet, runway length not checked"));
       }
-    });
 
-    var depCard = out.cards[DEP];
-    if (depCard && depCard.site) {
-      var c = calc.climb(ac.perf, depCard.pa, depCard.site.weather.oat);
-      var obstacle = null;
-      var o = state.obstacle;
-      depCard.obstacleError = "";
-      if (o.on) {
-        var nm = parse(o.nm), elev = parse(o.elev), limit = parse(o.limit), gs = parse(o.gs);
-        if (gs === null && c) gs = c[0];
-        if (nm === null || elev === null) {
-          depCard.obstacleError = "Enter the distance and elevation of the obstacle.";
-        } else if (isNaN(nm) || nm <= 0 || isNaN(elev) || (limit !== null && isNaN(limit)) ||
-                   gs === null || isNaN(gs) || gs <= 0) {
-          depCard.obstacleError = "Enter numbers: distance in NM, heights in ft, speed in kt.";
-        } else {
-          obstacle = { nm: nm, elevationFt: elev, limitFt: limit, gs: gs };
+      // Obstacles from the AIP: cleared after the take-off, listed under the approach.
+      var ad = D.AERODROMES[ev[1]];
+      if (r.noRunway || r.outside) return;
+      if (ev[0] === "take-off") {
+        var list = calc.takeoffObstacles(r.rwy, ad.obstacles);
+        var mine = ev[1] === DEP;
+        if (mine && manual) {
+          list = list.concat([manual]).sort(function (a, b) {
+            return a.along - b.along;
+          });
         }
+        r.obstacles = calc.obstacleClearance(ac, card.site, r, list, mine ? limit : null);
+        out.problems = out.problems.concat(r.obstacles.problems);
+        r.obstacles.notes.forEach(function (note) {
+          out.notices.push(note);
+        });
+      } else {
+        r.approach = calc.approachObstacles(r.rwy, ad.runways, ad.obstacles);
       }
-      depCard.climb = calc.climbCheck(ac, depCard.site, obstacle);
-      depCard.climbSpeed = c ? c[0] : null;
-      out.problems = out.problems.concat(depCard.climb.problems);
-    }
+    });
     return out;
   }
 
@@ -998,26 +1016,78 @@
     r.warnings.forEach(function (w) {
       html += '<p class="warnline">! ' + esc(w.charAt(0).toUpperCase() + w.slice(1)) + ".</p>";
     });
-    return html + "</div>";
+    return html + obstaclesHtml(r) + approachHtml(r) + "</div>";
   }
 
-  function climbHtml(card) {
-    var c = card.climb;
-    if (!c) return "";
-    if (!c.climb) return '<div class="report"><p>Rate of climb: outside the POH table.</p></div>';
-    var html = '<div class="report"><div class="report-head"><span class="report-title">Climb</span>' +
-      (c.obstacle ? (c.obstacle.ok ? '<span class="chip chip-ok">Clears the obstacle</span>' :
-        '<span class="chip chip-bad">Does not clear</span>') : "") + "</div>" +
-      "<p>Max rate of climb " + n(c.climb[1], 0) + " ft/min at " + c.climb[0] +
-      " KIAS (POH, max weight, flaps up).</p>";
-    var o = c.obstacle;
-    if (o) {
-      html += "<p>Obstacle " + n(o.nm, 1) + " NM away at " + n(o.elevationFt, 0) + " ft: at " + n(o.gs, 0) +
-        " kt that takes " + n(o.minutes, 1) + " min, climbing " + n(o.climbFt, 0) + " ft to " + n(o.reach, 0) +
-        " ft." + (o.limited ? " Altitude limit " + n(o.limitFt, 0) + " ft, so you cross it at " +
-        n(o.crossAt, 0) + " ft." : "") + " Clearance <strong>" + n(o.clearance, 0) + " ft</strong>.</p>";
+  // "700 m", "2.2 km, 200 m left", with * where the AIP gives no position.
+  function placeText(o) {
+    var d = o.along >= 1000 ? n(o.along / 1000, 1) + " km" : n(Math.round(o.along / 10) * 10, 0) + " m";
+    var side = Math.abs(o.cross) >= 50 ? ", " + n(Math.round(Math.abs(o.cross) / 10) * 10, 0) + " m " +
+      (o.cross > 0 ? "right" : "left") : "";
+    return d + side + (o.assumed ? " *" : "");
+  }
+
+  function obstaclesHtml(r) {
+    var o = r.obstacles;
+    if (!o) return "";
+    if (!o.climb) return '<p class="obs-title">After take-off</p><p>Rate of climb: outside the POH table.</p>';
+    var html = '<p class="obs-title">After take-off</p><p>Climb ' + n(o.climb[1], 0) + " ft/min at " + o.climb[0] +
+      " KIAS (POH, max weight, flaps up), ground speed " + n(o.gs, 0) + " kt: " + n(o.ftPerNm, 0) +
+      " ft per NM, from 50 ft at the end of the take-off distance (POH, not factored).</p>";
+    if (!o.rows.length) {
+      return html + "<p>No obstacles in the take-off path of RWY " + esc(r.rwy.rwy) + " in the AIP.</p>";
     }
-    return html + "</div>";
+    html += '<div class="table-scroll"><table class="data obs"><thead><tr><th>Obstacle</th><th>Ahead</th>' +
+      "<th>You</th><th>Clear</th></tr></thead><tbody>" + o.rows.map(function (row) {
+        var chip;
+        if (row.clearance === undefined) chip = '<span class="chip chip-warn">no elev.</span>';
+        else if (!row.ok) chip = '<span class="chip chip-bad">' + n(row.clearance, 0) + " ft</span>";
+        else if (row.clearance < calc.C.OBST_MARGIN_FT) chip = '<span class="chip chip-warn">+' + n(row.clearance, 0) + " ft</span>";
+        else chip = '<span class="chip chip-ok">+' + n(row.clearance, 0) + " ft</span>";
+        return "<tr><td>" + esc(row.what) + '<span class="sub">' +
+          (row.elevFt === null ? "elevation not published" : n(row.elevFt, 0) + " ft") + "</span></td><td>" +
+          placeText(row) + "</td><td>" +
+          (row.altFt === undefined ? "–" : n(row.altFt, 0) + " ft" + (row.limited ? " (limit)" : "")) +
+          '</td><td class="status">' + chip + "</td></tr>";
+      }).join("") + "</tbody></table></div>";
+    var notes = ["Obstacles from the AIP (AD 2.10) in the take-off path: 90 m either side at the end of the " +
+      "runway, widening by 12.5 % of the distance, out to 6 km. Heights above mean sea level."];
+    if (o.rows.some(function (row) { return row.assumed; })) {
+      notes.push("* The AIP gives no position: taken on the extended centre line.");
+    }
+    return html + notes.map(function (t) { return '<p class="hint">' + esc(t) + "</p>"; }).join("");
+  }
+
+  function approachHtml(r) {
+    if (!r.approach || !r.approach.length) return "";
+    var elev = D.AERODROMES[r.icao].elevationFt;
+    return '<p class="obs-title">Under the approach</p><ul class="obs-list">' + r.approach.map(function (o) {
+      var h = o.ob.elevFt === null ? "elevation not published" :
+        n(o.ob.elevFt, 0) + " ft (" + n(o.ob.elevFt - elev, 0) + " ft above the aerodrome)";
+      return "<li>" + esc(o.ob.what) + ", " + h + ", " + placeText(o) + " before the runway</li>";
+    }).join("") + "</ul>" + (r.approach.some(function (o) { return o.assumed; })
+      ? '<p class="hint">* The AIP gives no position: taken on the extended centre line.</p>' : "");
+  }
+
+  // Every obstacle the AIP lists at the aerodrome, for reference.
+  function allObstaclesHtml(icao) {
+    var ad = D.AERODROMES[icao];
+    if (!ad.obstacles || !ad.obstacles.length) return "";
+    return '<details class="method"><summary>All obstacles in the AIP at ' + icao + " (" + ad.obstacles.length +
+      ')</summary><ul class="obs-list">' + ad.obstacles.map(function (ob) {
+        var h = ob.elevFt === null ? "elevation not published" :
+          n(ob.elevFt, 0) + " ft (" + n(ob.elevFt - ad.elevationFt, 0) + " ft above the aerodrome)";
+        var where;
+        if (ob.pos) {
+          var p = calc.fromArp(ad, ob.pos);
+          where = (p.m >= 1000 ? n(p.m / 1000, 1) + " km" : n(Math.round(p.m / 10) * 10, 0) + " m") + " " +
+            pad(p.brg, 3) + "° from the ARP";
+        } else {
+          where = n(ob.ahead.m, 0) + " m beyond RWY " + [].concat(ob.ahead.rwy).join(" and RWY ") +
+            (ob.ahead.cross ? ", " + n(Math.abs(ob.ahead.cross), 0) + " m " + (ob.ahead.cross > 0 ? "right" : "left") : "");
+        }
+        return "<li>" + esc(ob.what) + ", " + h + ", " + where + "</li>";
+      }).join("") + '</ul><p class="hint">' + esc(ad.obstacleSource || "AIP AD 2.10") + ".</p></details>";
   }
 
   function renderPerformance(r) {
@@ -1050,7 +1120,6 @@
 
       if (icao === DEP) {
         $("obs-fields").hidden = !state.obstacle.on;
-        $("gs-obs").placeholder = card.climbSpeed ? String(card.climbSpeed) : "";
         setError("obs", state.obstacle.on ? card.obstacleError : "");
       }
       var html = "";
@@ -1062,7 +1131,7 @@
           (card.wx.ceil === Infinity ? "no ceiling" : n(card.wx.ceil, 0) + " ft") + ".</p>";
       }
       html += card.reports.map(reportHtml).join("");
-      if (icao === DEP) html += climbHtml(card);
+      html += allObstaclesHtml(icao);
       $("reports-" + icao).innerHTML = html;
     });
   }

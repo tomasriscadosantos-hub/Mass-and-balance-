@@ -150,6 +150,15 @@ test("aerodrome data: elevation, declared distances, bearings that fit the runwa
       const off = Math.abs(((r.bearing - parseInt(r.rwy, 10) * 10 + 540) % 360) - 180);
       assert.ok(off <= 10, where + " bearing " + r.bearing + " vs runway number");
       assert.equal(r.surface, "paved", where + " surface");
+      // the take-off run starts about TORA behind its end (the other direction's end)
+      const other = ad.runways.find((x) => x !== r);
+      const back = calc.obstacleOffset(r, { pos: other.toraEnd });
+      assert.ok(Math.abs(back.along + r.tora) <= 100 && Math.abs(back.cross) < 30, where + " toraEnd");
+    }
+    for (const ob of ad.obstacles) {
+      assert.ok(ob.what && (ob.elevFt === null || Number.isFinite(ob.elevFt)), icao + " obstacle " + ob.what);
+      assert.ok(ob.pos || [].concat(ob.ahead.rwy).every((x) => ad.runways.some((r) => r.rwy === x)),
+        icao + " obstacle " + ob.what + " position or runway");
     }
   }
 });
@@ -238,15 +247,62 @@ test("grass, tailwind, crosswind and missing distances", () => {
   assert.deepEqual(unknown.lines.map((l) => l.ok), [null]);
 });
 
-test("obstacle clearance, capped by the altitude limit", () => {
+test("obstacles: which ones are in the take-off path (90 m + 12.5 %, up to 6 km)", () => {
+  // A runway heading north whose take-off run ends at 38N 8W.
+  const rwy = { rwy: "36", bearing: 0, toraEnd: ["38 00 00N", "008 00 00W"], tora: 1000 };
+  const at = (northM, eastM) => {
+    const lat = 38 + northM / 111132, lon = -8 + eastM / (111320 * Math.cos((38 * Math.PI) / 180));
+    const dms = (v, pos, neg) => {
+      const a = Math.abs(v), d = Math.floor(a), m = Math.floor((a - d) * 60), s = ((a - d) * 60 - m) * 60;
+      return `${d} ${m} ${s.toFixed(3)}${v >= 0 ? pos : neg}`;
+    };
+    return [dms(lat, "N", "S"), dms(lon, "E", "W")];
+  };
+  const off = calc.obstacleOffset(rwy, { pos: at(500, -300) });
+  near(off.along, 500, 0.5, "along");
+  near(off.cross, -300, 0.5, "cross (left)");
+  const obstacles = [
+    { what: "near, too far left", elevFt: 100, pos: at(500, -300) }, // half-width 152 m
+    { what: "far, inside the splay", elevFt: 100, pos: at(3000, -300) }, // half-width 465 m
+    { what: "behind", elevFt: 100, pos: at(-200, 0) },
+    { what: "beyond 6 km", elevFt: 100, pos: at(6500, 0) },
+    { what: "listed ahead", elevFt: 50, ahead: { rwy: "36", m: 200 } },
+    { what: "other runway", elevFt: 50, ahead: { rwy: "18", m: 200 } },
+  ];
+  assert.deepEqual(calc.takeoffObstacles(rwy, obstacles).map((o) => o.ob.what),
+    ["listed ahead", "far, inside the splay"]);
+  // LPPM: the RWY 11 climb-out obstacles are the ones under the RWY 29 approach
+  const lppm = D.AERODROMES.LPPM;
+  assert.equal(calc.takeoffObstacles(lppm.runways[0], lppm.obstacles).length, 5);
+  assert.equal(calc.takeoffObstacles(lppm.runways[1], lppm.obstacles).length, 0);
+  assert.equal(calc.approachObstacles(lppm.runways[1], lppm.runways, lppm.obstacles).length, 5);
+});
+
+test("obstacle clearance: 50 ft at the take-off distance, then the POH climb", () => {
   const ac = D.AIRCRAFT["OK-KUN"];
-  const site = { icao: "TEST", elevationFt: 10, weather: { qnh: 1009, oat: 31, dir: 0, kt: 0 } };
-  const r = calc.climbCheck(ac, site, { nm: 3, elevationFt: 400, limitFt: 1000, gs: 60 });
-  assert.equal(r.obstacle.crossAt, 1000);
-  assert.equal(r.obstacle.clearance, 600);
-  const low = calc.climbCheck(D.AIRCRAFT["OK-HAD"], { ...site, weather: { qnh: 1018, oat: 24, dir: 0, kt: 0 } },
-    { nm: 1, elevationFt: 659, limitFt: 1000, gs: 67 });
-  assert.equal(low.obstacle.ok, false);
+  const ad = D.AERODROMES.LPPM;
+  const r11 = ad.runways[0];
+  const site = { icao: "LPPM", elevationFt: 5, rwy: r11, weather: { qnh: 1013, oat: 15, dir: 110, kt: 0, gust: null } };
+  const rep = calc.runwayCheck(ac, "take-off", site, 0, { rules: "om" });
+  const list = calc.takeoffObstacles(r11, ad.obstacles);
+  const o = calc.obstacleClearance(ac, site, rep, list);
+  const hill = o.rows.find((r) => r.what === "Natural high point");
+  const perM = o.ftPerNm / 1852;
+  near(hill.altFt, 5 + 50 + perM * (770 + 700 - rep.dist), 1e-9, "altitude over the hill");
+  assert.equal(hill.clearance, hill.altFt - 164);
+  assert.ok(hill.ok && hill.clearance > 100);
+  assert.equal(o.rows.find((r) => r.elevFt === null).clearance, undefined); // reservoir: no elevation
+  assert.deepEqual(o.problems, []);
+  // a headwind steepens the climb over the ground
+  const windy = calc.runwayCheck(ac, "take-off", { ...site, weather: { ...site.weather, kt: 15 } }, 0, { rules: "om" });
+  assert.ok(calc.obstacleClearance(ac, site, windy, list).ftPerNm > o.ftPerNm);
+  // an altitude limit caps it, and an obstacle it can't clear is a problem
+  const tower = { ob: { what: "Tower", elevFt: 400 }, along: 1852, cross: 0, assumed: false };
+  const capped = calc.obstacleClearance(ac, site, rep, [tower], 350);
+  assert.equal(capped.rows[0].altFt, 350);
+  assert.equal(capped.rows[0].limited, true);
+  assert.equal(capped.problems.length, 1);
+  assert.match(capped.problems[0], /Tower \(400 ft\) 1852 m beyond the runway not cleared \(-50 ft\)/);
 });
 
 test("solo weather minima (OM C 5)", () => {

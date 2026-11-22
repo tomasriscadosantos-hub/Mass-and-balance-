@@ -11,6 +11,22 @@
 
   var CHANGES = [
     {
+      id: 6,
+      date: "2026-11-22",
+      items: [
+        {
+          title: "Obstacles from the AIP",
+          text: "Every take-off now checks the obstacles the AIP lists in its path: your altitude over each " +
+            "one and the clearance. Landings list the obstacles under the approach.",
+        },
+        {
+          title: "Your own obstacle",
+          text: "Still there for a crane from a NOTAM, now measured from the end of the runway. The " +
+            "ground speed comes from the wind.",
+        },
+      ],
+    },
+    {
       id: 5,
       date: "2026-11-22",
       items: [
