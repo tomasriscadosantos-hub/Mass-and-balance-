@@ -11,6 +11,17 @@
 
   var CHANGES = [
     {
+      id: 5,
+      date: "2026-11-22",
+      items: [
+        {
+          title: "Every runway checked",
+          text: "Faro, Évora, Beja and Ponte de Sor now have their runway lengths from the AIP, so " +
+            "take-off and landing are checked against them at every aerodrome.",
+        },
+      ],
+    },
+    {
       id: 4,
       date: "2026-11-22",
       items: [

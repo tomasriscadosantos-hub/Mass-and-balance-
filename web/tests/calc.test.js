@@ -138,6 +138,22 @@ const LPEV_TEST = {
   weather: { qnh: 1015, oat: 30, dir: 310, kt: 8, gust: null },
 };
 
+test("aerodrome data: elevation, declared distances, bearings that fit the runway numbers", () => {
+  for (const [icao, ad] of Object.entries(D.AERODROMES)) {
+    assert.ok(Number.isFinite(ad.elevationFt), icao + " elevation");
+    assert.ok(ad.source, icao + " source");
+    assert.ok(ad.runways.length >= 2, icao + " runways");
+    for (const r of ad.runways) {
+      const where = icao + " RWY " + r.rwy;
+      for (const k of ["tora", "toda", "asda", "lda"]) assert.ok(r[k] > 0, where + " " + k);
+      assert.ok(r.toda >= r.tora && r.asda >= r.tora, where + " TODA/ASDA at least TORA");
+      const off = Math.abs(((r.bearing - parseInt(r.rwy, 10) * 10 + 540) % 360) - 180);
+      assert.ok(off <= 10, where + " bearing " + r.bearing + " vs runway number");
+      assert.equal(r.surface, "paved", where + " surface");
+    }
+  }
+});
+
 test("LPPM (VFR Manual AD 2-LPPM): RWY 11 TORA 770, RWY 29 LDA 770, checked", () => {
   const ad = D.AERODROMES.LPPM;
   const [r11, r29] = ad.runways;

@@ -86,9 +86,9 @@
    * Aerodromes - copy from the Portuguese AIP (AD 2) or the VFR Manual (MVFR)
    * published by NAV Portugal, and check again every AIRAC cycle.
    *
-   * Left empty on purpose until copied from the AIP: without an elevation the
-   * performance can't be worked out there, and without declared distances the
-   * runway lengths aren't checked.
+   * A new aerodrome can be added with nulls until its data is copied: without
+   * an elevation the performance can't be worked out there, and without
+   * declared distances the runway lengths aren't checked.
    *
    * Runways, one entry per direction:
    *   rwy      designator, e.g. "29"
@@ -98,7 +98,7 @@
    *   surface  "paved" or "grass"
    *
    * arp: aerodrome reference point as in the AIP, used for the distance to the
-   * alternate. Marked "check" where it isn't from the AIP yet.
+   * alternate and the sunrise/sunset times.
    */
   var DEPARTURE = "LPPM";
   // OM A: LPPM has a single runway; Faro (LPFR) is the briefed alternate.
@@ -122,51 +122,62 @@
         { rwy: "29", bearing: 287.5, tora: 860, toda: 860, asda: 860, lda: 770, surface: "paved" },
       ],
     },
+    // Faro: AIP Portugal LPFR AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
     LPFR: {
       name: "Faro",
-      arp: ["37 00 53N", "007 57 56W"], // check against the AIP
-      elevationFt: null,
-      source: null,
-      runways: [],
+      arp: ["37 00 52N", "007 57 57W"],
+      elevationFt: 24, // 7 m
+      source: "AIP LPFR AD 2 (AIRAC 008-26)",
+      runways: [
+        // RWY 10/28: 2490 x 45 m asphalt, THR displaced 45 m at both ends,
+        // CWY 155 m.
+        { rwy: "10", bearing: 100.07, tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
+        { rwy: "28", bearing: 280.07, tora: 2490, toda: 2645, asda: 2490, lda: 2445, surface: "paved" },
+      ],
     },
+    // Évora: AIP Portugal LPEV AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
     LPEV: {
       name: "Évora",
-      arp: ["38 31 47N", "007 53 31W"], // AIP chart
-      // AIP Portugal LPEV AD 2.24.01-1 aerodrome chart (12 AUG 2021, AIRAC
-      // 003-21): ARP 38 31 47N 007 53 31W, elevation 246 m.
-      elevationFt: 807,
-      source: "AIP LPEV AD 2.24.01-1 (AIRAC 003-21)",
+      arp: ["38 31 47N", "007 53 31W"],
+      elevationFt: 807, // 246 m
+      source: "AIP LPEV AD 2 (AIRAC 008-26)",
       ipma: { station: 843, page: "https://ema.ipma.pt/afis/evora-aerodromo/" },
       runways: [
-        // RWY 01/19: asphalt 1300 x 23 m, displaced threshold at both ends.
-        // Declared distances: AIP AD 2.13 (not on the chart).
-        { rwy: "01", bearing: 6, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
-        { rwy: "19", bearing: 186, tora: null, toda: null, asda: null, lda: null, surface: "paved" },
+        // RWY 01/19: 1300 x 23 m asphalt, THR 01 displaced 54 m, THR 19 40 m.
+        { rwy: "01", bearing: 4.25, tora: 1260, toda: 1300, asda: 1300, lda: 1245, surface: "paved" },
+        { rwy: "19", bearing: 184.25, tora: 1245, toda: 1300, asda: 1300, lda: 1260, surface: "paved" },
         // RWY 07/25 (sand, 530 x 30 m) left out: no POH data for sand.
       ],
     },
     // Beja: on the OM C training routes (LPPM-LPBJ-LPEV-LPPM, LPPM-LPBJ-LPFR-LPPM).
+    // AIP Portugal LPBJ AD 2.2, 2.12, 2.13 (AIRAC 006/007-26, 06-AUG-2026).
     LPBJ: {
       name: "Beja",
-      arp: ["38 04 44N", "007 55 55W"], // check against the AIP
-      elevationFt: null,
-      source: null,
-      runways: [],
+      arp: ["38 04 44N", "007 55 57W"],
+      elevationFt: 636, // 194 m
+      source: "AIP LPBJ AD 2 (AIRAC 007-26)",
+      runways: [
+        // RWY 01L/19R: 3450 x 60 m concrete, slippery when wet. Full-length
+        // declared distances (the AIP also gives intersection departures).
+        // RWY 01R/19L: taxiing only, left out.
+        { rwy: "01L", bearing: 5.93, tora: 3450, toda: 3815, asda: 3450, lda: 3450, surface: "paved" },
+        { rwy: "19R", bearing: 185.93, tora: 3450, toda: 4040, asda: 3450, lda: 3450, surface: "paved" },
+      ],
     },
-    // Ponte de Sor: cross-country destination. Not in the VFR Manual (it's in
-    // the AIP, which is offline): position and elevation are those of IPMA's
-    // station at the aerodrome, which for LPPM and LPEV match the ARP.
+    // Ponte de Sor: cross-country destination. AIP Portugal LPSO AD 2.2, 2.12,
+    // 2.13 (AIRAC 007-26, 01-OCT-2026).
     LPSO: {
       name: "Ponte de Sor",
-      arp: ["39 12 42N", "008 03 28W"], // IPMA station 817; check against the AIP
-      elevationFt: 390, // 119 m, IPMA station 817
-      source: "IPMA station 817 (position, elevation 119 m, runway numbers)",
+      arp: ["39 12 42N", "008 03 28W"],
+      elevationFt: 390, // 119 m
+      source: "AIP LPSO AD 2 (AIRAC 007-26)",
       ipma: { station: 817, page: "https://ema.ipma.pt/afis/ponte-de-sor-aerodromo/" },
       runways: [
-        // RWY 03/21 as the IPMA station gives them; heading = designator x 10.
-        // Surface and declared distances: AIP AD 2.12 / 2.13, still to add.
-        { rwy: "03", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
-        { rwy: "21", bearing: null, tora: null, toda: null, asda: null, lda: null, surface: null },
+        // RWY 03/21: 1800 x 30 m asphalt. The true bearing is published as
+        // NIL: worked out from the threshold coordinates (391215.60N
+        // 0080342.92W and 391308.87N 0080312.29W, 1801 m apart).
+        { rwy: "03", bearing: 24, tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
+        { rwy: "21", bearing: 204, tora: 1800, toda: 1800, asda: 1800, lda: 1800, surface: "paved" },
       ],
     },
   };

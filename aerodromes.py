@@ -4,9 +4,9 @@ Aerodrome data for the take-off and landing checks.
 Copy it from the Portuguese AIP (AD 2) or the VFR Manual (MVFR) published by
 NAV Portugal (ais.nav.pt), and check it again every AIRAC cycle.
 
-The runway data is LEFT EMPTY ON PURPOSE: until an aerodrome's elevation and
-runways are filled in, the program skips the runway checks there instead of
-using made-up numbers.
+A new aerodrome can be added with None until its data is copied: until its
+elevation and runways are filled in, the program skips the runway checks
+there instead of using made-up numbers.
 
 For each runway direction add one line to "runways":
     rwy      designator, e.g. "29"
@@ -37,42 +37,59 @@ AERODROMES = {
              "asda": 860, "lda": 770, "surface": "paved"},
         ],
     },
+    # Faro: AIP Portugal LPFR AD 2 (AIRAC 008-26). RWY 10/28 2490 x 45 m
+    # asphalt, THR displaced 45 m at both ends.
     "LPFR": {
         "name": "Faro",
         "nm_from_departure": 31,      # straight line from LPPM
-        "elevation_ft": None,
-        "runways": [],
+        "elevation_ft": 24,           # 7 m
+        "runways": [
+            {"rwy": "10", "bearing": 100.07, "tora": 2490, "toda": 2645,
+             "asda": 2490, "lda": 2445, "surface": "paved"},
+            {"rwy": "28", "bearing": 280.07, "tora": 2490, "toda": 2645,
+             "asda": 2490, "lda": 2445, "surface": "paved"},
+        ],
     },
+    # Evora: AIP Portugal LPEV AD 2 (AIRAC 008-26). RWY 01/19 1300 x 23 m
+    # asphalt, THR 01 displaced 54 m, THR 19 40 m.
     "LPEV": {
         "name": "Evora",
         "nm_from_departure": 89,
-        # AIP Portugal LPEV AD 2.24.01-1, aerodrome chart (12 AUG 2021,
-        # AIRAC 003-21): ARP 38 31 47N 007 53 31W, elevation 246 m.
-        "elevation_ft": 807,
+        "elevation_ft": 807,          # 246 m
         "runways": [
-            # RWY 01/19: asphalt 1300 x 23 m, displaced threshold at both
-            # ends. Declared distances: AIP AD 2.13 (not on the chart).
-            {"rwy": "01", "bearing": 6, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": "paved"},
-            {"rwy": "19", "bearing": 186, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": "paved"},
+            {"rwy": "01", "bearing": 4.25, "tora": 1260, "toda": 1300,
+             "asda": 1300, "lda": 1245, "surface": "paved"},
+            {"rwy": "19", "bearing": 184.25, "tora": 1245, "toda": 1300,
+             "asda": 1300, "lda": 1260, "surface": "paved"},
             # RWY 07/25 (sand, 530 x 30 m) is left out: the POH has no
             # performance data for sand.
         ],
     },
+    # Beja: AIP Portugal LPBJ AD 2 (AIRAC 007-26). RWY 01L/19R 3450 x 60 m
+    # concrete, slippery when wet; 01R/19L is for taxiing only.
+    "LPBJ": {
+        "name": "Beja",
+        "nm_from_departure": 64,
+        "elevation_ft": 636,          # 194 m
+        "runways": [
+            {"rwy": "01L", "bearing": 5.93, "tora": 3450, "toda": 3815,
+             "asda": 3450, "lda": 3450, "surface": "paved"},
+            {"rwy": "19R", "bearing": 185.93, "tora": 3450, "toda": 4040,
+             "asda": 3450, "lda": 3450, "surface": "paved"},
+        ],
+    },
+    # Ponte de Sor: AIP Portugal LPSO AD 2 (AIRAC 007-26). RWY 03/21
+    # 1800 x 30 m asphalt; true bearing worked out from the threshold
+    # coordinates (published as NIL).
     "LPSO": {
         "name": "Ponte de Sor",
         "nm_from_departure": 126,
-        # Not in the VFR Manual (it's in the AIP): elevation 119 m from the
-        # IPMA station at the aerodrome (station 817).
-        "elevation_ft": 390,
+        "elevation_ft": 390,          # 119 m
         "runways": [
-            # RWY 03/21 as the IPMA station gives them. Surface and declared
-            # distances: AIP AD 2.12 / 2.13, still to add.
-            {"rwy": "03", "bearing": None, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": None},
-            {"rwy": "21", "bearing": None, "tora": None, "toda": None,
-             "asda": None, "lda": None, "surface": None},
+            {"rwy": "03", "bearing": 24, "tora": 1800, "toda": 1800,
+             "asda": 1800, "lda": 1800, "surface": "paved"},
+            {"rwy": "21", "bearing": 204, "tora": 1800, "toda": 1800,
+             "asda": 1800, "lda": 1800, "surface": "paved"},
         ],
     },
 }

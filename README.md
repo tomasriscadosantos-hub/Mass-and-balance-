@@ -224,17 +224,18 @@ Some data is **left blank on purpose**, so the program never runs on made-up num
 2. **Aerodrome data.** In the web app it is in `web/js/data.js`, in the terminal version in
    `aerodromes.py`. Where it stands:
 
-   | Aerodrome | Source | Runway checks |
-   |---|---|---|
-   | LPPM Portimão | VFR Manual AD 2-LPPM (20-MAR-2025): RWY 11/29, 860 × 27 m asphalt; RWY 11 TORA/TODA 770, ASDA/LDA 860; RWY 29 TORA/TODA/ASDA 860, LDA 770 (THR displaced 90 m). True bearing 107.5°/287.5° from the threshold coordinates | Yes |
-   | LPEV Évora | AIP aerodrome chart (AIRAC 003-21): elevation, RWY 01/19 asphalt | Declared distances missing |
-   | LPSO Ponte de Sor | IPMA station 817: position, elevation 119 m, RWY 03/21 | Surface and declared distances missing |
-   | LPFR Faro, LPBJ Beja | — | Elevation and runways missing |
+   | Aerodrome | Source | Elevation | Runway (true bearing) | TORA / TODA / ASDA / LDA (m) |
+   |---|---|---|---|---|
+   | LPPM Portimão | VFR Manual AD 2-LPPM (20-MAR-2025) | 5 ft | 11/29, 860 × 27 asphalt (107.5°/287.5°*) | 11: 770/770/860/860 · 29: 860/860/860/770 |
+   | LPFR Faro | AIP AD 2 (AIRAC 008-26) | 24 ft | 10/28, 2490 × 45 asphalt (100.07°/280.07°) | both: 2490/2645/2490/2445 |
+   | LPEV Évora | AIP AD 2 (AIRAC 008-26) | 807 ft | 01/19, 1300 × 23 asphalt (4.25°/184.25°) | 01: 1260/1300/1300/1245 · 19: 1245/1300/1300/1260 |
+   | LPBJ Beja | AIP AD 2 (AIRAC 007-26) | 636 ft | 01L/19R, 3450 × 60 concrete (5.93°/185.93°) | 01L: 3450/3815/3450/3450 · 19R: 3450/4040/3450/3450 |
+   | LPSO Ponte de Sor | AIP AD 2 (AIRAC 007-26) | 390 ft | 03/21, 1800 × 30 asphalt (24°/204°*) | both: 1800/1800/1800/1800 |
 
-   LPEV, LPSO, LPFR and LPBJ are in the AIP (AD 2), not in the VFR Manual. Copy the missing
-   elevation and runway data (TORA, TODA, ASDA, LDA in metres, surface, bearing) from the AIP
-   published by NAV Portugal (ais.nav.pt) into both files. Until then the runway checks for that
-   aerodrome are skipped. Check the data again every AIRAC cycle.
+   \* Published as not available: worked out from the threshold coordinates (the same method
+   gives Faro's published 100.07° exactly). Left out: Évora's sand runway 07/25 (no POH data for
+   sand) and Beja's 01R/19L (taxiing only). The data is in `web/js/data.js` and in
+   `aerodromes.py`; check it again every AIRAC cycle.
 
 Also check the arms, limits, fuel capacity and planning fuel flow against each aircraft's own
 POH and the school's procedures. To add another alternate, add it to `AERODROMES` with its
