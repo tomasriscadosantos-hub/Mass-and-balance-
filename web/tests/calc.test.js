@@ -424,10 +424,14 @@ test("departure briefing in the SOP's order, filled in from the take-off", () =>
   const known = k11.rep.obstacles.rows.filter((r) => r.clearance !== undefined);
   const least = Math.min(...known.map((r) => r.clearance));
   assert.match(k11.get("Obstacles"), new RegExp("^YES: .*cleared by " + Math.round(least) + " ft \\(5 in the take-off path\\)$"));
-  // OK-HAD: POH speeds; tailwind and calm
+  // OK-HAD: C152 SOP speeds, the POH's 60 KIAS for an engine failure; tailwind and calm
   const had = brief("OK-HAD", r29, { dir: 110, kt: 5 });
-  assert.equal(had.b.source, "POH");
+  assert.equal(had.b.source, "SOP");
   assert.equal(had.get("Vr"), "50 KIAS");
+  assert.equal(had.get("Climb"), "65–75 KIAS to 500 ft AGL");
+  assert.equal(had.get("Engine failure after take-off"), "60 KIAS (POH), land straight ahead");
+  assert.match(had.b.note, /the SOP says 65 KIAS flaps up, 60 flaps down; the POH says 60 KIAS/);
+  assert.equal(kun.b.note, null);
   assert.equal(had.get("Vy / Vx"), "67 / 55 KIAS");
   assert.equal(had.get("Wind"), "110/05, no crosswind, tailwind 5 kt");
   assert.equal(had.get("Ailerons"), "neutral");

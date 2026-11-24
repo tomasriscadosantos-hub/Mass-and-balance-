@@ -11,6 +11,18 @@
 
   var CHANGES = [
     {
+      id: 11,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "C152 SOP",
+          text: "The 152's departure briefing now follows the school's C152 SOP: rotate 50 KIAS, climb " +
+            "65–75 KIAS to 500 ft. For an engine failure after take-off it gives the POH's 60 KIAS: the SOP " +
+            "says 65 flaps up / 60 flaps down, and the SOP itself says to follow the POH where they differ.",
+        },
+      ],
+    },
+    {
       id: 10,
       date: "2026-11-24",
       items: [

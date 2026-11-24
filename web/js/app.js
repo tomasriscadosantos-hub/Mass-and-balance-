@@ -1268,8 +1268,8 @@
     return '<details class="dep-brief"' + (b.open ? " open" : "") + "><summary>Departure briefing</summary>" +
       "<dl>" + b.items.map(function (it) {
         return "<dt>" + esc(it[0]) + "</dt><dd>" + esc(it[1]) + "</dd>";
-      }).join("") + '</dl><p class="hint">' + esc(from) + " Add the turn after departure, the initial altitude " +
-      "and who takes control in an emergency.</p></details>";
+      }).join("") + '</dl><p class="hint">' + esc(from) + (b.note ? " " + esc(b.note) : "") +
+      " Add the turn after departure, the initial altitude and who takes control in an emergency.</p></details>";
   }
 
   // "700 m", "2.2 km, 200 m left", with * where the AIP gives no position.

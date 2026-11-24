@@ -37,10 +37,11 @@ It follows the Flying Academy Operations Manual (Rev. 1, Sep 2024):
 Under every take-off it also gives the **departure briefing** in the order of the school's C172P SOP
 (departure crew briefing): runway, TORA / TORR, obstacles (yes, naming the one cleared by the least,
 or nil), wind and crosswind, which way to hold the ailerons, Vr, Vy / Vx, climb speed and the
-engine-failure speed. The speeds are in `departure` for each aircraft in `js/data.js`: the SOP for
-the 172 (rotate 55 KIAS, climb 70–80 KIAS to 500 ft AGL, engine failure 65 KIAS flaps up / 60 flaps
-down), the POH for the 152 until its SOP is in the app (nose wheel up at 50 KIAS, climb 65–75 KIAS,
-engine failure 60 KIAS). The take-off results also say that the POH distances are for the short-field
+engine-failure speed. The speeds are in `departure` for each aircraft in `js/data.js`, from the
+school's SOPs: the 172 (rotate 55 KIAS, climb 70–80 KIAS to 500 ft AGL, engine failure 65 KIAS flaps
+up / 60 flaps down) and the 152 (rotate 50 KIAS, climb 65–75 KIAS to 500 ft AGL). For an engine
+failure after take-off in the 152 the app gives the POH's 60 KIAS: the C152 SOP says 65 flaps up /
+60 flaps down, and the SOP says the POH applies where they differ. The take-off results also say that the POH distances are for the short-field
 technique (flaps 10°), so a normal take-off needs more runway.
 
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of

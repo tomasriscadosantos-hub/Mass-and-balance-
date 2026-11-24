@@ -44,16 +44,20 @@
       cgAft: 36.5,
       envelopeMinLb: 1000, // bottom of the POH envelope chart
       maxSoloHours: 3, // OM A: longest uninterrupted student solo flight
-      // Departure briefing. No school SOP for the 152 in the app yet, so from
-      // the POH: section 4 (normal take-off, speeds) and section 3 (engine
-      // failure immediately after take-off).
+      // Departure briefing: the school's C152 SOP (take-off, after take-off);
+      // best angle of climb from POH section 4. Engine failure immediately
+      // after take-off from POH section 3: the SOP gives 65 KIAS flaps up /
+      // 60 flaps down, the POH 60 KIAS, and the SOP says the POH applies
+      // where they differ.
       departure: {
-        source: "POH",
-        normal: "flaps 0–10°, nose wheel up at 50 KIAS, climb 65–75 KIAS",
+        source: "SOP",
+        normal: "flaps 0°, rotate 50 KIAS, climb 65–75 KIAS",
         vr: 50,
         vx: [55, 55], // best angle of climb at sea level and 10,000 ft
-        climbOut: "65–75 KIAS",
-        engineFailure: "60 KIAS",
+        climbOut: "65–75 KIAS to 500 ft AGL",
+        engineFailure: "60 KIAS (POH), land straight ahead",
+        note: "Engine failure after take-off: the SOP says 65 KIAS flaps up, 60 flaps down; the POH says " +
+          "60 KIAS, and the SOP says to follow the POH where they differ.",
       },
     },
     "OK-KUN": {

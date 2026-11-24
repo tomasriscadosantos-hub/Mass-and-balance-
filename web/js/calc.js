@@ -991,7 +991,7 @@
     items.push(["Vy / Vx", vy + (vx === null ? "" : " / " + vx) + " KIAS"]);
     if (s.climbOut) items.push(["Climb", s.climbOut]);
     if (s.engineFailure) items.push(["Engine failure after take-off", s.engineFailure]);
-    return { items: items, source: s.source || null, normal: s.normal || null };
+    return { items: items, source: s.source || null, normal: s.normal || null, note: s.note || null };
   }
 
   // Best rate of climb at the departure (POH, maximum weight).
