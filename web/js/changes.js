@@ -11,6 +11,18 @@
 
   var CHANGES = [
     {
+      id: 15,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Crosswind at the limit",
+          text: "Crosswind and tailwind are now compared in whole knots, as shown: 12 kt of crosswind is " +
+            "within the 152's 12 kt maximum demonstrated, 13 kt is not. Before, 12.1 kt showed as 12 kt " +
+            "and was flagged. Required runway distances are shown rounded up.",
+        },
+      ],
+    },
+    {
       id: 14,
       date: "2026-11-24",
       items: [

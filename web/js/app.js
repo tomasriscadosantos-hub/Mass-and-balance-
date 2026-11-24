@@ -1310,7 +1310,7 @@
       var avail = l.available === null || l.available === undefined ? "–" : n(l.available, 0) + " m";
       var chip = l.ok === null ? '<span class="chip chip-warn">no data</span>' :
         l.ok ? '<span class="chip chip-ok">OK</span>' : '<span class="chip chip-bad">Not OK</span>';
-      return "<tr><td>" + esc(l.label) + "</td><td>" + n(l.need, 0) + " m</td><td>" + (l.ok === false ? "&gt;" : "&lt;") +
+      return "<tr><td>" + esc(l.label) + "</td><td>" + n(Math.ceil(l.need), 0) + " m</td><td>" + (l.ok === false ? "&gt;" : "&lt;") +
         "</td><td>" + esc(l.name) + " " + avail + '</td><td class="status">' + chip + "</td></tr>";
     }).join("") + "</tbody></table></div>";
     if (r.rules === "classb" && isTakeoff && r.unchecked && r.lines.length === 2) {

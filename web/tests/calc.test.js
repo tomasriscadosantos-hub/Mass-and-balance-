@@ -280,8 +280,27 @@ test("OM rules, student solo: TORA 600 m, x1.67, crosswind limit with gusts", ()
   // dual flight: only the 12 kt maximum demonstrated applies (13 kt gust at 60° = 11.3 kt)
   const dual = calc.runwayCheck(ac, "landing", gusty, 1400, { rules: "om" });
   assert.equal(dual.warnings.length, 0);
-  const strong = { ...short, weather: { ...short.weather, gust: 14 } }; // 12.1 kt
-  assert.equal(calc.runwayCheck(ac, "landing", strong, 1400, { rules: "om" }).warnings.length, 1);
+  // compared to the knot, as shown: a 14 kt gust gives 12.1 kt, i.e. 12 kt, within the 12 kt maximum
+  const atLimit = { ...short, weather: { ...short.weather, gust: 14 } };
+  assert.equal(calc.runwayCheck(ac, "landing", atLimit, 1400, { rules: "om" }).warnings.length, 0);
+  const strong = { ...short, weather: { ...short.weather, gust: 15 } }; // 13.0 kt
+  assert.deepEqual(calc.runwayCheck(ac, "landing", strong, 1400, { rules: "om" }).warnings,
+    ["crosswind 13 kt in the gusts is above the 12 kt maximum demonstrated"]);
+});
+
+test("tailwind compared to the knot, required distances shown rounded up", () => {
+  const ac = D.AIRCRAFT["OK-HAD"];
+  const rwy = { ...LPEV_TEST.rwy, bearing: 10 };
+  const tail = (kt) => calc.runwayCheck(ac, "take-off",
+    { ...LPEV_TEST, rwy, weather: { ...LPEV_TEST.weather, dir: 190, kt, gust: null } }, 1400, { rules: "om" });
+  assert.equal(tail(10).warnings.filter((w) => /tailwind/.test(w)).length, 0); // 10 kt: what the POH covers
+  assert.deepEqual(tail(11).warnings.filter((w) => /tailwind/.test(w)), ["tailwind 11 kt is more than the 10 kt the POH covers"]);
+  // a failing distance never reads as equal to what's available
+  const r = calc.runwayCheck(ac, "take-off", LPEV_TEST, 1400, { rules: "om" });
+  const need = r.lines[0].need;
+  const tight = calc.runwayCheck(ac, "take-off", { ...LPEV_TEST, rwy: { ...LPEV_TEST.rwy, tora: Math.ceil(need) - 1 } },
+    1400, { rules: "om" });
+  assert.match(tight.problems[0], new RegExp("50 ft ×1.5 " + Math.ceil(need) + " m is more than TORA \\(" + (Math.ceil(need) - 1) + " m\\)"));
 });
 
 test("class B rules: the previous sheet's LPEV landing example", () => {
@@ -411,7 +430,7 @@ test("departure briefing in the SOP's order, filled in from the take-off", () =>
     ["Departure", "Runway", "TORA / TORR", "Obstacles", "Wind", "Ailerons", "Vr", "Vy / Vx", "Climb", "Engine failure after take-off"]);
   assert.equal(kun.b.source, "SOP");
   assert.equal(kun.get("Runway"), "29");
-  assert.equal(kun.get("TORA / TORR"), "860 m / " + Math.round(kun.rep.dist * 1.5) + " m");
+  assert.equal(kun.get("TORA / TORR"), "860 m / " + Math.ceil(kun.rep.dist * 1.5) + " m");
   assert.equal(kun.get("Obstacles"), "NIL in the AIP");
   assert.equal(kun.get("Wind"), "320/12, crosswind 6 kt from the right");
   assert.equal(kun.get("Ailerons"), "right, into the wind, on the ground roll");
@@ -454,7 +473,7 @@ test("landing briefing in the SOP's order, filled in from the landing", () => {
   const kun = land("OK-KUN", "LPPM", lppm.runways[1], { dir: 320, kt: 12 });
   assert.deepEqual(kun.b.items.map((it) => it[0]), ["Runway", "LDA / LDR", "Wind", "Runway surface", "Obstacles",
     "Final approach", "Short field (POH)", "Touchdown", "200 ft AGL", "Go-around"]);
-  assert.equal(kun.get("LDA / LDR"), "770 m / " + Math.round(kun.rep.dist * 1.5) + " m");
+  assert.equal(kun.get("LDA / LDR"), "770 m / " + Math.ceil(kun.rep.dist * 1.5) + " m");
   assert.equal(kun.get("Wind"), "320/12, crosswind 6 kt from the right");
   assert.equal(kun.get("Runway surface"), "paved");
   assert.match(kun.get("Obstacles"), /^YES: natural high point 164 ft AMSL, .* before the runway \(5 under the approach\)$/);
@@ -465,7 +484,7 @@ test("landing briefing in the SOP's order, filled in from the landing", () => {
   assert.equal(kun.b.normal, "60–70 KIAS with flaps");
   // OK-HAD solo on a contaminated runway: LDR is the x1.92 distance; RWY 11 has nothing under its approach
   const solo = land("OK-HAD", "LPPM", lppm.runways[0], { dir: 0, kt: 0 }, { rules: "om", solo: true }, true);
-  assert.equal(solo.get("LDA / LDR"), "860 m / " + Math.round(solo.rep.dist * 1.92) + " m");
+  assert.equal(solo.get("LDA / LDR"), "860 m / " + Math.ceil(solo.rep.dist * 1.92) + " m");
   assert.equal(solo.get("Runway surface"), "paved, contaminated: braking poorer, distances longer");
   assert.equal(solo.get("Obstacles"), "NIL in the AIP");
   assert.equal(solo.get("Final approach"), "60–70 KIAS flaps up, 55–65 KIAS flaps down");
@@ -473,7 +492,7 @@ test("landing briefing in the SOP's order, filled in from the landing", () => {
   // class B: 50 ft distance within 70 % of the LDA, so LDR = 50 ft / 0.7; LPCS RWY 17 slopes down
   const lpcs = D.AERODROMES.LPCS;
   const cb = land("OK-HAD", "LPCS", lpcs.runways[0], { dir: 170, kt: 5 }, { rules: "classb" });
-  assert.equal(cb.get("LDA / LDR"), "1210 m / " + Math.round(cb.rep.dist / 0.7) + " m");
+  assert.equal(cb.get("LDA / LDR"), "1210 m / " + Math.ceil(cb.rep.dist / 0.7) + " m");
   assert.equal(cb.get("Runway surface"), "paved, slopes down 0.9 %");
 });
 

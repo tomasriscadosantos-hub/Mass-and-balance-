@@ -21,6 +21,8 @@ BEFORE USING THIS FOR A REAL FLIGHT:
      aircraft's own POH / flight manual and your school's procedures.
 """
 
+import math
+
 import performance as perf
 from aerodromes import AERODROMES, ALTERNATES, DEPARTURE, missing_data
 
@@ -367,12 +369,16 @@ def runway_report(ac, kind, icao, mass, site, note=""):
         check("50 ft clearance", dist, f"{perf.LDA_FRACTION:.0%} LDA",
               rwy["lda"] * perf.LDA_FRACTION)
 
+    # Wind comes in whole knots: compare to the knot, as shown (12 kt of
+    # crosswind is within a 12 kt maximum). Half a knot rounds up, as in the app.
     warnings = []
-    if -head > perf.MAX_TAILWIND_KT:
-        warnings.append(f"tailwind {-head:.0f} kt is more than the "
+    tail_kt = math.floor(-head + 0.5)
+    cross_kt = math.floor(cross + 0.5)
+    if tail_kt > perf.MAX_TAILWIND_KT:
+        warnings.append(f"tailwind {tail_kt} kt is more than the "
                         f"{perf.MAX_TAILWIND_KT} kt the POH covers")
-    if cross > data["max_crosswind_kt"]:
-        warnings.append(f"crosswind {cross:.0f} kt is above the "
+    if cross_kt > data["max_crosswind_kt"]:
+        warnings.append(f"crosswind {cross_kt} kt is above the "
                         f"{data['max_crosswind_kt']} kt maximum demonstrated")
     for w in warnings:
         print("  ! " + w)

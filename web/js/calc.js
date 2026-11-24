@@ -585,7 +585,8 @@
       if (known(available)) {
         line.ok = need <= available;
         if (!line.ok) {
-          result.problems.push(where + ": " + label + " " + need.toFixed(0) +
+          // the check is exact; shown rounded up, so a failing 770.3 m reads 771 m
+          result.problems.push(where + ": " + label + " " + Math.ceil(need) +
             " m is more than " + name + " (" + available.toFixed(0) + " m)");
         }
       } else {
@@ -622,8 +623,11 @@
         known(rwy.lda) ? rwy.lda * C.LDA_FRACTION : null);
     }
 
-    if (-head > C.MAX_TAILWIND_KT) {
-      result.warnings.push("tailwind " + (-head).toFixed(0) + " kt is more than the " +
+    // Wind comes in whole knots: the tailwind and crosswind are compared to the
+    // knot, as shown (12 kt of crosswind is within a 12 kt maximum).
+    var tailKt = Math.round(-head);
+    if (tailKt > C.MAX_TAILWIND_KT) {
+      result.warnings.push("tailwind " + tailKt + " kt is more than the " +
         C.MAX_TAILWIND_KT + " kt the POH covers");
     }
     // Crosswind including gusts (OM C 1.4 note, OM A 5.2.4).
@@ -634,8 +638,9 @@
       xwWhat = "the student's " + xwLimit + " kt solo limit";
     }
     result.xwindLimitKt = xwLimit;
-    if (gustCross > xwLimit + 1e-9) {
-      result.warnings.push("crosswind " + gustCross.toFixed(0) + " kt" +
+    var crossKt = Math.round(gustCross);
+    if (crossKt > xwLimit + 1e-9) {
+      result.warnings.push("crosswind " + crossKt + " kt" +
         (known(wx.gust) ? " in the gusts" : "") + " is above " + xwWhat);
     }
     result.warnings.forEach(function (w) {
@@ -945,7 +950,7 @@
     });
     var tora = report.noRunway ? null : rwy.tora;
     items.push(["TORA / TORR", (known(tora) ? Math.round(tora) + " m" : "–") + " / " +
-      (report.outside ? "outside the POH table" : torr === null ? "–" : Math.round(torr) + " m")]);
+      (report.outside ? "outside the POH table" : torr === null ? "–" : Math.ceil(torr) + " m")]);
 
     var obs = report.obstacles;
     var obsText;
@@ -1019,7 +1024,7 @@
     });
     var lda = report.noRunway ? null : rwy.lda;
     items.push(["LDA / LDR", (known(lda) ? Math.round(lda) + " m" : "–") + " / " +
-      (report.outside ? "outside the POH table" : ldr === null ? "–" : Math.round(ldr) + " m")]);
+      (report.outside ? "outside the POH table" : ldr === null ? "–" : Math.ceil(ldr) + " m")]);
 
     items.push(["Wind", windBrief(report).text]);
 
