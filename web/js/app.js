@@ -1040,7 +1040,66 @@
       figure("CG at take-off", n(tom.cg, 2) + " in", n(tom.fwd, 2) + " – " + n(tom.aft, 2) + " in") +
       figure("Minimum fuel", n(f.requiredGal, 1) + " gal", "on board " + n(f.requiredGal + f.extraGal, 1) +
         " · extra " + n(f.extraGal, 1)) +
-      "</div>";
+      "</div>" +
+      '<div class="summary-actions"><button type="button" class="btn-ghost" data-print>Print</button>' +
+      '<span class="hint">Mass and balance, fuel and performance on A4, or save as PDF.</span></div>';
+  }
+
+  // Printed only: what the sheet is for (aircraft, date, route, fuel, rules).
+  function renderPrintHead(r) {
+    var box = $("print-head");
+    if (!r.mb) {
+      box.innerHTML = "";
+      return;
+    }
+    var ac = r.ac;
+    var dest = state.dest === OTHER ? "destination" : state.dest;
+    var route = [DEP];
+    var legs = [];
+    var from = DEP;
+    r.stops.forEach(function (s) {
+      route.push(s.icao + (s.refuelToGal !== null ? " (refuel to " + n(s.refuelToGal, 1) + " gal)" : ""));
+      legs.push(from + "–" + s.icao + " " + calc.hhmm(s.tripH) + ", " + Math.round(s.groundH * 60) + " min on the ground");
+      from = s.icao;
+    });
+    route.push(dest);
+    legs.push(from + "–" + dest + " " + calc.hhmm(readTime(state.tripH, state.tripM)));
+    var alts = [state.alt === OTHER ? "other aerodrome" : state.alt].concat(r.stops.map(function (s, k) {
+      return s.altIcao + " (leg " + (k + 1) + ")";
+    }));
+    var f = r.mb.fuel;
+    var rows = [
+      ["Aircraft", ac.type + " " + state.reg],
+      ["Date", longDate(r.date) + (state.tkof ? ", take-off " + state.tkof + " UTC" : "")],
+      ["Route", route.join(" → ")],
+      ["Flight time", legs.join(" · ")],
+      ["Alternate", alts.join(", ")],
+      ["Fuel on board", n(f.requiredGal + f.extraGal, 1) + " US gal, minimum " + n(f.requiredGal, 1)],
+      ["Runway checks", (state.rules === "om" ? "Flying Academy OM" : "Class B (old sheet)") + ", POH tables " +
+        (state.method === "next" ? "read at the next higher value" : "interpolated") +
+        (r.solo ? ". Student solo" : "")],
+    ];
+    box.innerHTML = '<div class="print-title"><span>LPPM Flight</span><span>Mass and balance and performance</span></div>' +
+      "<dl>" + rows.map(function (row) {
+        return "<dt>" + esc(row[0]) + "</dt><dd>" + esc(row[1]) + "</dd>";
+      }).join("") + '<dt>Printed</dt><dd id="print-time"></dd></dl>';
+    stampPrintTime();
+  }
+
+  function stampPrintTime() {
+    var el = $("print-time");
+    if (!el) return;
+    var d = new Date();
+    el.textContent = longDate(d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate()) + " " +
+      String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0") +
+      " local, app update " + (MB.changes && MB.changes.length ? MB.changes[0].id : "?");
+  }
+
+  function bindPrint() {
+    $("summary").addEventListener("click", function (e) {
+      if (e.target.closest("[data-print]")) window.print();
+    });
+    window.addEventListener("beforeprint", stampPrintTime);
   }
   function figure(k, v, s) {
     return '<div class="figure"><div class="k">' + esc(k) + '</div><div class="v">' + v +
@@ -1747,6 +1806,7 @@
     last = r;
     renderErrors(r);
     renderSummary(r);
+    renderPrintHead(r);
     renderSheet(r);
     renderLimits(r);
     renderChart(r);
@@ -1863,6 +1923,7 @@
   bindSimpleInputs();
   renderSources();
   bindBriefing();
+  bindPrint();
   update();
   loadWeather();
   initWhatsNew();

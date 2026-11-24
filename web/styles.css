@@ -582,3 +582,70 @@ dialog.sheet::backdrop {
 @keyframes sheet-in { from { transform: translateY(32px); opacity: 0; } }
 @keyframes scrim-in { from { opacity: 0; } }
 @keyframes item-in { from { transform: translateY(8px); opacity: 0; } }
+
+/* --------------------------------------------------------------- print */
+/* Print (Print button, or the browser's own): the results on A4 in light
+   colours, without the inputs, buttons, weather downloads and method notes.
+   The header and the signature lines are printed only. */
+.summary-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.print-head, .print-sign { display: none; }
+
+@media print {
+  @page { size: A4; margin: 12mm 12mm 14mm; }
+  :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f3f5f6;
+    --ink: #000000;
+    --muted: #3f4850;
+    --line: #b9c2c9;
+    --accent: #a3236f;
+    --accent-ink: #ffffff;
+    --accent-soft: #f6e4ee;
+    --ok: #1d7445;
+    --ok-bg: #e2f2e8;
+    --warn: #8a5a00;
+    --warn-bg: #faefd6;
+    --bad: #b42318;
+    --bad-bg: #fbe5e3;
+    --env-fill: rgba(20, 32, 42, 0.06);
+    --grid: #dfe4e8;
+    color-scheme: light;
+    padding: 0;
+    font-size: 11.5px; /* everything is in rem: a compact sheet */
+  }
+  html, body { background: #ffffff !important; color: #000000; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .topbar, .col-inputs, .foot, dialog, .summary-actions, .perf-method, .ad-inputs, .obstacle, .missing,
+  details.method, .error, section[aria-labelledby="h-brief"], details.dep-brief:not([open]),
+  .panel-head .link-btn { display: none !important; }
+
+  /* Plain blocks: grid containers break badly across pages. Long reports may
+     run onto the next page; the chart, briefings and table rows stay whole. */
+  .wrap, .col-results, .panel, #aerodromes, .aerodrome, .reports, .report, .chart { display: block; }
+  .wrap { max-width: none; padding: 0; }
+  .col-results > * + *, .panel > * + *, .aerodrome > * + *, .reports > * + *, .report > * + *,
+  .chart > * + * { margin-top: 6px; }
+  .panel { padding: 10px 12px; border-radius: 6px; }
+  .table-scroll { overflow: visible; }
+  .chart, .figures, .verdict, .issues li, .dep-brief, table.data tr, .obs-list li { break-inside: avoid; }
+  h2, .panel-head, .aerodrome-head, .report-head, .facts, .obs-title, .dep-brief summary { break-after: avoid; }
+  .chart-box { min-height: 0; width: 50%; margin: 0 auto; }
+  .dep-brief summary { min-height: 0; padding: 2px 0; list-style: none; }
+  .dep-brief summary::-webkit-details-marker { display: none; }
+  a { color: inherit; text-decoration: none; }
+
+  .print-head { display: block; padding: 0 0 6px; border-bottom: 2px solid #000; }
+  .print-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .print-title span:first-child { font: 700 1.6rem/1 var(--font-display); letter-spacing: 0.05em; text-transform: uppercase; }
+  .print-title span:last-child { font: 700 1.1rem/1 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; }
+  .print-head dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; font-size: var(--step--1); }
+  .print-head dt { color: var(--muted); }
+  .print-head dd { margin: 0; }
+
+  .print-sign { display: block; break-inside: avoid; padding-top: 6px; font-size: var(--step--1); }
+  .print-sign p { margin: 0 0 18px; color: var(--muted); }
+  .print-sign-lines { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .print-sign-lines span { border-top: 1px solid #000; padding-top: 3px; }
+}

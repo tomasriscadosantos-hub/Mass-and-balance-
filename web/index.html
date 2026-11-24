@@ -126,6 +126,8 @@
   </div>
 
   <div class="col-results">
+    <!-- Printed only: the flight the sheet is for (filled in by app.js). -->
+    <section class="print-head" id="print-head"></section>
     <section class="panel summary" id="summary" aria-live="polite"></section>
 
     <section class="panel" aria-labelledby="h-sheet">
@@ -205,6 +207,14 @@
           <li>Fuel (OM part C 2.1): taxi + trip + alternate + 45 min final reserve. Trip and alternate each include 10 min for approach and landing. With stops, every leg is checked at its take-off with the fuel carried from the last refuelling, and the app says the least to load where you refuel. AVGAS is sold at LPPM, LPEV and LPCS only (AIP AD 2.4): LPFR and LPBJ have JET A1 only, LPSO no fuel.</li>
         </ul>
       </details>
+    </section>
+
+    <!-- Printed only. -->
+    <section class="print-sign">
+      <p>Training aid: check every result against the POH and the aircraft's current weight and balance report.</p>
+      <div class="print-sign-lines">
+        <span>Pilot in command</span><span>Signature</span><span>Instructor</span>
+      </div>
     </section>
 
     <footer class="foot">

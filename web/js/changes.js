@@ -11,6 +11,19 @@
 
   var CHANGES = [
     {
+      id: 13,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Print",
+          text: "The Print button under the result prints the mass and balance, CG chart, fuel and performance " +
+            "with the briefings on A4, or saves them as a PDF. The sheet starts with the aircraft, date, route, " +
+            "flight times, alternate and fuel, and ends with lines to sign. On an iPhone or iPad, if the button " +
+            "does nothing in the home-screen app, open the app in Safari and use Share → Print.",
+        },
+      ],
+    },
+    {
       id: 12,
       date: "2026-11-24",
       items: [
