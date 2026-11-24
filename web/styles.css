@@ -150,7 +150,19 @@ h2 {
 .col-inputs, .col-results { display: grid; gap: 16px; min-width: 0; align-content: start; }
 @media (min-width: 960px) {
   .wrap { grid-template-columns: minmax(320px, 390px) minmax(0, 1fr); align-items: start; }
-  .col-inputs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); }
+  /* The inputs stay in view and scroll on their own, so their bottom is
+     reachable wherever the results are scrolled to. */
+  .col-inputs {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    max-height: calc(100vh - env(safe-area-inset-top, 0px) - 88px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 88px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 2px 2px 16px; /* room for focus rings inside the scroll box */
+    margin: -2px;
+  }
 }
 
 .panel {

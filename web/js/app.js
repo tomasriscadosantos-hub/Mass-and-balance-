@@ -233,7 +233,7 @@
     return from !== s.icao ? from : Object.keys(D.AERODROMES).filter(function (k) { return k !== s.icao; })[0];
   }
   function newStop() {
-    var used = [DEP].concat(state.stops.map(function (s) { return s.icao; }));
+    var used = [DEP, state.dest].concat(state.stops.map(function (s) { return s.icao; }));
     var icao = Object.keys(D.AERODROMES).filter(function (k) { return used.indexOf(k) < 0; })[0] || "LPEV";
     return { icao: icao, h: "", m: "", ground: "", refuel: !!D.AERODROMES[icao].avgas, to: "", alt: "" };
   }
