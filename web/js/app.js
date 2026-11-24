@@ -12,6 +12,8 @@
   var DEP = D.DEPARTURE;
 
   var WX_KEYS = ["qnh", "oat", "dir", "kt", "gust", "vis", "ceil"];
+  var MAX_STOPS = 4;
+  var GROUND_MIN = 30; // time on the ground at a stop when none is typed
 
   // Example: a navigation flight to Évora with Faro as the alternate.
   var EXAMPLE = {
@@ -25,6 +27,7 @@
     fUnit: "gal",
     fuel: "40.0",
     fuelFull: true,
+    stops: [], // landings on the way: { icao, h, m, ground, refuel, to, alt }
     dest: "LPEV",
     tripH: "1",
     tripM: "00",
@@ -98,6 +101,9 @@
         }
       });
       if (!D.AIRCRAFT[s.reg]) s.reg = EXAMPLE.reg;
+      s.stops = (Array.isArray(s.stops) ? s.stops : []).filter(function (st) {
+        return st && D.AERODROMES[st.icao];
+      }).slice(0, MAX_STOPS);
     }
     return s;
   }
@@ -209,6 +215,112 @@
     $("alt-hint").textContent = from
       ? "Straight line from " + from + " at " + ac.cruiseKt + " kt. Fuel adds 10 min for the approach and landing."
       : "Type the flight time from your destination to the alternate.";
+  }
+
+  // ------------------------------------------------------- stops on the way
+
+  function stopFrom(i) {
+    return i === 0 ? DEP : state.stops[i - 1].icao;
+  }
+  function lastPoint() {
+    return state.stops.length ? state.stops[state.stops.length - 1].icao : DEP;
+  }
+  // Alternate for the leg to stop i: the one chosen, or back where the leg started.
+  function stopAlt(i) {
+    var s = state.stops[i];
+    if (s.alt && s.alt !== s.icao && D.AERODROMES[s.alt]) return s.alt;
+    var from = stopFrom(i);
+    return from !== s.icao ? from : Object.keys(D.AERODROMES).filter(function (k) { return k !== s.icao; })[0];
+  }
+  function newStop() {
+    var used = [DEP].concat(state.stops.map(function (s) { return s.icao; }));
+    var icao = Object.keys(D.AERODROMES).filter(function (k) { return used.indexOf(k) < 0; })[0] || "LPEV";
+    return { icao: icao, h: "", m: "", ground: "", refuel: !!D.AERODROMES[icao].avgas, to: "", alt: "" };
+  }
+
+  function buildStops() {
+    var ac = aircraft();
+    var unit = state.fUnit === "l" ? "L" : "gal";
+    var codes = Object.keys(D.AERODROMES);
+    $("stops").innerHTML = state.stops.map(function (s, i) {
+      var ad = D.AERODROMES[s.icao];
+      var from = stopFrom(i);
+      var legNm = calc.distanceNm(D.AERODROMES[from], ad);
+      var places = codes.map(function (k) {
+        return '<option value="' + k + '">' + k + " · " + esc(D.AERODROMES[k].name) +
+          (D.AERODROMES[k].avgas ? "" : " (no AVGAS)") + "</option>";
+      }).join("");
+      var alts = codes.filter(function (k) { return k !== s.icao; }).map(function (k) {
+        var nm = calc.distanceNm(ad, D.AERODROMES[k]);
+        return '<option value="' + k + '">' + k + " · " + n(nm, 0) + " NM, " + calc.hhmm(nm / ac.cruiseKt) + "</option>";
+      }).join("");
+      var refuel = ad.avgas
+        ? '<div class="refuel"><label class="checkbox"><input type="checkbox" id="stop-rf-' + i + '"> Refuel at ' +
+          s.icao + '</label><div class="input-row" id="stop-to-wrap-' + i + '"><span class="unit">to</span>' +
+          '<input id="stop-to-' + i + '" type="text" inputmode="decimal" placeholder="full" autocomplete="off" ' +
+          'aria-label="Refuel to"><span class="unit">' + unit + "</span></div></div>"
+        : '<p class="nofuel">No AVGAS at ' + s.icao + ": the fuel has to last from the last refuelling.</p>";
+      return '<div class="stop" id="stop-' + i + '"><div class="stop-head"><span class="stop-title">Stop ' + (i + 1) +
+        '</span><button type="button" class="link-btn" data-remove-stop="' + i + '">Remove</button></div>' +
+        '<div class="field"><label for="stop-ad-' + i + '">Land at</label><select id="stop-ad-' + i + '">' + places +
+        "</select></div>" +
+        '<div class="field"><span class="label" id="lbl-stop-t-' + i + '">Flight time from ' + from + "</span>" +
+        '<div class="input-row time" role="group" aria-labelledby="lbl-stop-t-' + i + '">' +
+        '<input id="stop-h-' + i + '" type="text" inputmode="numeric" aria-label="Hours" autocomplete="off">' +
+        '<span class="unit">h</span><input id="stop-m-' + i + '" type="text" inputmode="numeric" aria-label="Minutes" ' +
+        'autocomplete="off"><span class="unit">min</span></div><p class="hint">' + from + "–" + s.icao + " " +
+        n(legNm, 0) + " NM, about " + calc.hhmm(legNm / ac.cruiseKt) + " at " + ac.cruiseKt + " kt.</p></div>" +
+        '<div class="fields"><div class="field"><label for="stop-g-' + i + '">On the ground</label>' +
+        '<div class="input-row"><input id="stop-g-' + i + '" type="text" inputmode="numeric" placeholder="' + GROUND_MIN +
+        '" autocomplete="off"><span class="unit">min</span></div></div>' +
+        '<div class="field"><label for="stop-alt-' + i + '">Alternate, this leg</label><select id="stop-alt-' + i + '">' +
+        alts + "</select></div></div>" + refuel + '<p class="error" id="err-stop-' + i + '" hidden></p></div>';
+    }).join("");
+
+    state.stops.forEach(function (s, i) {
+      var input = function (id, key) {
+        var el = $(id);
+        el.value = s[key] || "";
+        el.addEventListener("input", function () {
+          s[key] = el.value;
+          changed();
+        });
+      };
+      var ad = $("stop-ad-" + i);
+      ad.value = s.icao;
+      ad.addEventListener("change", function () {
+        s.icao = ad.value;
+        s.refuel = !!D.AERODROMES[s.icao].avgas;
+        s.alt = "";
+        buildStops();
+        buildRoute();
+        changed();
+      });
+      input("stop-h-" + i, "h");
+      input("stop-m-" + i, "m");
+      input("stop-g-" + i, "ground");
+      var alt = $("stop-alt-" + i);
+      alt.value = stopAlt(i);
+      alt.addEventListener("change", function () {
+        s.alt = alt.value;
+        changed();
+      });
+      var rf = $("stop-rf-" + i);
+      if (rf) {
+        rf.checked = !!s.refuel;
+        $("stop-to-wrap-" + i).hidden = !s.refuel;
+        rf.addEventListener("change", function () {
+          s.refuel = rf.checked;
+          $("stop-to-wrap-" + i).hidden = !s.refuel;
+          changed();
+        });
+        input("stop-to-" + i, "to");
+      }
+    });
+    $("add-stop").hidden = state.stops.length >= MAX_STOPS;
+    $("add-stop").textContent = state.stops.length ? "Add another stop" : "Add a stop on the way";
+    $("lbl-dest").textContent = state.stops.length ? "Destination (after the stops)" : "Destination";
+    $("lbl-trip").textContent = state.stops.length ? "Flight time from " + lastPoint() : "Flight time";
   }
 
   function wxField(icao, key, label, unit, mode, placeholder) {
@@ -363,6 +475,19 @@
       state.alt = e.target.value;
       changed();
     });
+    $("add-stop").addEventListener("click", function () {
+      if (state.stops.length >= MAX_STOPS) return;
+      state.stops.push(newStop());
+      buildStops();
+      changed();
+    });
+    $("stops").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-remove-stop]");
+      if (!b) return;
+      state.stops.splice(Number(b.dataset.removeStop), 1);
+      buildStops();
+      changed();
+    });
     $("reset").addEventListener("click", function () {
       state = clone(EXAMPLE);
       rebuildAll();
@@ -373,6 +498,7 @@
       if (state.fuelFull) state.fuel = fullFuelText(aircraft());
       buildStations();
       buildRoute();
+      buildStops();
       fillSimpleInputs();
     });
     bindSeg("wunit-seg", "wUnit", function (before) {
@@ -384,10 +510,16 @@
       buildStations();
     });
     bindSeg("funit-seg", "fUnit", function (before) {
-      var x = parse(state.fuel);
-      if (x !== null && !isNaN(x)) {
-        state.fuel = before === "gal" ? n(x * D.LITRES_PER_GAL, 1) : n(x / D.LITRES_PER_GAL, 1);
-      }
+      var convert = function (text) {
+        var x = parse(text);
+        if (x === null || isNaN(x)) return text;
+        return before === "gal" ? n(x * D.LITRES_PER_GAL, 1) : n(x / D.LITRES_PER_GAL, 1);
+      };
+      state.fuel = convert(state.fuel);
+      state.stops.forEach(function (st) {
+        st.to = convert(st.to);
+      });
+      buildStops();
       if (state.fuelFull) state.fuel = fullFuelText(aircraft());
       $("fuel").value = state.fuel;
     });
@@ -398,6 +530,7 @@
   function rebuildAll() {
     buildStations();
     buildRoute();
+    buildStops();
     fillSimpleInputs();
     Object.keys(D.AERODROMES).forEach(function (icao) {
       WX_KEYS.forEach(function (key) {
@@ -504,6 +637,40 @@
       else if (isNaN(altH)) errors.alt = "Enter hours and minutes as numbers.";
     }
 
+    // Stops on the way: each a landing, a time on the ground and a new take-off.
+    var stops = [];
+    state.stops.forEach(function (s, i) {
+      var key = "stop-" + i;
+      var name = "Stop " + (i + 1) + ": ";
+      var ad = D.AERODROMES[s.icao];
+      var from = stopFrom(i);
+      var t = readTime(s.h, s.m);
+      var g = parse(s.ground);
+      if (g === null) g = GROUND_MIN;
+      var to = null;
+      if (s.icao === from) {
+        errors[key] = name + "choose an aerodrome other than " + from + ", where the leg starts.";
+      } else if (t === null) {
+        errors[key] = name + "enter the flight time from " + from + ".";
+      } else if (isNaN(t) || t <= 0) {
+        errors[key] = name + "enter the flight time in hours and minutes.";
+      } else if (isNaN(g) || g < 0) {
+        errors[key] = name + "enter the time on the ground in minutes.";
+      } else if (ad.avgas && s.refuel) {
+        var x = parse(s.to);
+        if (x === null) to = ac.usableFuelGal;
+        else if (isNaN(x) || x <= 0) errors[key] = name + "enter the fuel to refuel to, or leave it empty for full.";
+        else to = state.fUnit === "l" ? x / D.LITRES_PER_GAL : x;
+      }
+      if (errors[key]) return;
+      var alt = stopAlt(i);
+      stops.push({ icao: s.icao, label: s.icao, tripH: t, groundH: g / 60, refuelToGal: to, avgas: !!ad.avgas,
+        altIcao: alt, altLabel: alt, altH: calc.distanceNm(ad, D.AERODROMES[alt]) / ac.cruiseKt });
+    });
+    if (state.stops.length && state.dest === lastPoint()) {
+      errors.trip = "The destination is the last stop: choose where you fly to after it, or remove the stop.";
+    }
+
     // Solo: the instructor seat can be left empty (C152 only).
     var solo = ac.stations.some(function (st, i) {
       return st.empty === "solo" && !loads[i] && !errors["load-" + i];
@@ -522,6 +689,7 @@
       solo: solo, demoXwind: demo };
     if (Object.keys(errors).length) return result;
 
+    result.stops = stops;
     result.mb = calc.massBalance(ac, {
       loads: loads,
       fuelGal: fuelGal,
@@ -529,24 +697,42 @@
       altH: altH,
       altLabel: altIcao || "alternate",
       solo: solo,
+      departureLabel: DEP,
+      destLabel: state.dest === OTHER ? "destination" : state.dest,
+      stops: stops,
     });
     result.problems = result.mb.problems.slice();
     result.perf = performance(ac, result.mb, altIcao,
-      { rules: state.rules, solo: solo, xwindLimitKt: xwindLimit });
+      { rules: state.rules, solo: solo, xwindLimitKt: xwindLimit }, stops);
     result.problems = result.problems.concat(result.perf.problems);
     result.notices = result.perf.notices;
 
+    // Fuel to load where there's fuel, when it has to last past stops without.
+    result.mb.fuel.fuelling.forEach(function (fp) {
+      if (fp.until.length < 2) return;
+      var dry = fp.until.slice(0, -1).map(function (icao) {
+        var st = stops.filter(function (x) { return x.icao === icao; })[0];
+        return st && !st.avgas ? "no AVGAS at " + icao : "no refuelling at " + icao;
+      });
+      result.notices.push("Fuel: load at least " + n(fp.minGal, 1) + " gal at " + fp.at + ", enough for " + fp.at +
+        " → " + fp.until.join(" → ") + " (" + dry.join(", ") + ")");
+    });
+
     // Daylight (OM A: cross-country flights land 30 min before sunset).
     result.date = state.date || today();
+    // The final landing comes after every leg and the time on the ground at each stop.
+    var elapsedH = stops.reduce(function (sum, st) {
+      return sum + st.tripH + st.groundH;
+    }, tripH);
     result.day = calc.daylight({
       date: result.date,
       takeoffMin: clockMin(state.tkof),
-      tripH: tripH,
+      tripH: elapsedH,
       altH: altH,
       departure: D.AERODROMES[DEP],
       dest: state.dest === OTHER ? null : D.AERODROMES[state.dest],
       alt: altIcao ? D.AERODROMES[altIcao] : null,
-      crossCountry: state.dest !== DEP,
+      crossCountry: state.dest !== DEP || stops.length > 0,
     });
     var d = result.day;
     if (d.beforeSunrise) {
@@ -592,10 +778,12 @@
     }
   }
 
-  function performance(ac, mb, altIcao, opts) {
+  function performance(ac, mb, altIcao, opts, stops) {
+    stops = stops || [];
     var dest = state.dest === OTHER ? null : state.dest;
     var involved = [];
-    [DEP, dest, altIcao].forEach(function (icao) {
+    [DEP].concat(stops.map(function (s) { return s.icao; }), [dest, altIcao],
+      stops.map(function (s) { return s.altIcao; })).forEach(function (icao) {
       if (icao && involved.indexOf(icao) < 0) involved.push(icao);
     });
     var roles = {};
@@ -604,11 +792,17 @@
       (roles[icao] = roles[icao] || []).push(label);
     }
     role(DEP, "Departure");
+    stops.forEach(function (s, k) {
+      role(s.icao, "Stop " + (k + 1) + (s.refuelToGal !== null ? ", refuel" : ""));
+    });
     role(dest, "Destination");
     role(altIcao, "Alternate");
+    stops.forEach(function (s, k) {
+      role(s.altIcao, "Alternate, leg " + (k + 1));
+    });
 
     var out = { involved: involved, roles: roles, cards: {}, problems: [], notices: [], fieldErrors: {} };
-    var crossCountry = state.dest !== DEP; // OM A: a flight away from the home aerodrome
+    var crossCountry = state.dest !== DEP || stops.length > 0; // OM A: a flight away from the home aerodrome
     var source = null; // first aerodrome on the route: the others can reuse its weather
     involved.forEach(function (icao) {
       var ad = D.AERODROMES[icao];
@@ -678,12 +872,20 @@
     if (out.cards[DEP]) out.cards[DEP].obstacleError = obstacleError;
 
     var m = mb.byName;
-    [
-      ["take-off", DEP, m.TOM.lb, "Take-off"],
-      ["landing", dest, m.LM.lb, "Landing"],
-      ["take-off", altIcao, m.TOM.lb, "Take-off at the alternate"],
-      ["landing", altIcao, m.ALT.lb, "Landing at the alternate"],
-    ].forEach(function (ev) {
+    // In flying order: each stop is a landing and a take-off; then the
+    // destination and the alternates.
+    var events = [["take-off", DEP, m.TOM.lb, "Take-off"]];
+    stops.forEach(function (s, k) {
+      events.push(["landing", s.icao, m["L" + (k + 1)].lb, "Landing, stop " + (k + 1)]);
+      events.push(["take-off", s.icao, m["T" + (k + 1)].lb, "Take-off, stop " + (k + 1)]);
+    });
+    events.push(["landing", dest, m.LM.lb, "Landing"]);
+    events.push(["take-off", altIcao, m.TOM.lb, "Take-off at the alternate"]);
+    events.push(["landing", altIcao, m.ALT.lb, "Landing at the alternate"]);
+    stops.forEach(function (s, k) {
+      events.push(["landing", s.altIcao, m["L" + (k + 1)].lb, "Landing, alternate for leg " + (k + 1)]);
+    });
+    events.forEach(function (ev) {
       var card = ev[1] && out.cards[ev[1]];
       if (!card || !card.site) return;
       var r = calc.runwayCheck(ac, ev[0], card.site, ev[2], opts);
@@ -745,6 +947,9 @@
     });
     ["fuel", "trip", "alt", "xwind"].forEach(function (k) {
       setError(k, r.errors[k]);
+    });
+    state.stops.forEach(function (st, i) {
+      setError("stop-" + i, r.errors["stop-" + i]);
     });
     $("fuel").setAttribute("aria-invalid", String(!!r.errors.fuel));
     $("xwind").setAttribute("aria-invalid", String(!!r.errors.xwind));
@@ -874,6 +1079,23 @@
       }).join("") + "</tbody>";
     var f = r.mb.fuel;
     var altLabel = state.alt === OTHER ? "the alternate" : state.alt;
+    $("fuel-legs-wrap").hidden = f.legs.length < 2;
+    if (f.legs.length > 1) {
+      $("fuel-left").textContent = f.fuelling.map(function (fp) {
+        return "Load at least " + n(fp.minGal, 1) + " gal at " + fp.at + " (for " + fp.at + " → " +
+          fp.until.join(" → ") + ")";
+      }).join(". ") + ". At each take-off the OM fuel is taxi + trip + alternate + " + D.FINAL_RESERVE_MIN +
+        " min, each with 10 min for the approach. Left at " + altLabel + " at the end: " + n(f.leftGal, 1) +
+        " gal, about " + n(f.leftMin, 0) + " min.";
+      $("fuel-legs").innerHTML = "<thead><tr><th>Leg</th><th>On board</th><th>Needed</th><th>Landing</th>" +
+        "<th></th></tr></thead><tbody>" + f.legs.map(function (l) {
+          return "<tr><td>" + l.from + "–" + l.to + (l.refuelled && l.from !== DEP ? " ⛽" : "") + "</td><td>" +
+            n(l.blockGal, 1) + "</td><td>" + n(l.requiredGal, 1) + "</td><td>" + n(l.landingGal, 1) +
+            '</td><td class="status">' + (l.ok ? '<span class="chip chip-ok">OK</span>'
+              : '<span class="chip chip-bad">Short ' + n(l.requiredGal - l.blockGal, 1) + "</span>") + "</td></tr>";
+        }).join("") + "</tbody>";
+      return;
+    }
     $("fuel-left").textContent = "Minimum fuel " + n(f.requiredGal, 1) + " gal = taxi " + n(f.taxiGal, 1) +
       " + trip " + n(f.tripGal, 1) + " + alternate " + n(f.altGal, 1) + " + final reserve " +
       n(f.reserveGal, 1) + " (" + D.FINAL_RESERVE_MIN + " min at " + r.ac.fuelFlowGph + " gal/h). On board " +
@@ -916,7 +1138,11 @@
       [(ac.cgAft * bottom) / 1000, bottom],
     ];
     var by = r.mb.byName;
-    var pts = ["TOM", "LM", "ALT", "ZFM"].map(function (k) {
+    // Take-offs and landings in flying order, the alternate, then zero fuel.
+    var order = r.mb.conditions.filter(function (c) {
+      return /^(TOM|LM|ALT|T\d+|L\d+)$/.test(c.key);
+    }).map(function (c) { return c.key; }).concat(["ZFM"]);
+    var pts = order.map(function (k) {
       return { name: k, x: by[k].moment, y: by[k].lb, ok: by[k].ok, c: by[k] };
     });
     var xs = env.map(function (p) { return p[0]; }).concat(pts.map(function (p) { return p.x; }));
@@ -949,10 +1175,11 @@
       return sx(p[0]).toFixed(1) + "," + sy(p[1]).toFixed(1);
     }).join(" ") + '"/>');
 
-    var line = pts.slice(0, 3).map(function (p) { return sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1); }).join(" ");
+    var alt = pts[pts.length - 2], zfm = pts[pts.length - 1];
+    var line = pts.slice(0, -1).map(function (p) { return sx(p.x).toFixed(1) + "," + sy(p.y).toFixed(1); }).join(" ");
     svg.push('<polyline class="path" points="' + line + '"/>');
-    svg.push('<polyline class="path-zero" points="' + sx(pts[2].x).toFixed(1) + "," + sy(pts[2].y).toFixed(1) + " " +
-      sx(pts[3].x).toFixed(1) + "," + sy(pts[3].y).toFixed(1) + '"/>');
+    svg.push('<polyline class="path-zero" points="' + sx(alt.x).toFixed(1) + "," + sy(alt.y).toFixed(1) + " " +
+      sx(zfm.x).toFixed(1) + "," + sy(zfm.y).toFixed(1) + '"/>');
 
     // Labels to the right of each point, pushed down so they never overlap.
     var placed = pts.map(function (p) { return { p: p, x: sx(p.x), y: sy(p.y) }; })
@@ -1269,7 +1496,8 @@
 
   function routeAerodromes() {
     var list = [];
-    [DEP, state.dest, state.alt].forEach(function (icao) {
+    [DEP].concat(state.stops.map(function (st) { return st.icao; }), [state.dest, state.alt],
+      state.stops.map(function (st, i) { return stopAlt(i); })).forEach(function (icao) {
       if (icao && icao !== OTHER && list.indexOf(icao) < 0) list.push(icao);
     });
     return list;
@@ -1592,6 +1820,7 @@
   buildAircraft();
   buildStations();
   buildRoute();
+  buildStops();
   buildAerodromes();
   fillSimpleInputs();
   bindSimpleInputs();

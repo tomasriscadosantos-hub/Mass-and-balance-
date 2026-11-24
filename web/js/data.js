@@ -112,6 +112,7 @@
    *
    * arp: aerodrome reference point as in the AIP, used for the distance to the
    * alternate and the sunrise/sunset times.
+   * avgas: AVGAS sold there (AD 2.4), so the aircraft can refuel at a stop.
    */
   var DEPARTURE = "LPPM";
   // OM A: LPPM has a single runway; Faro (LPFR) is the briefed alternate.
@@ -119,6 +120,7 @@
   var AERODROMES = {
     LPPM: {
       name: "Portimão",
+      avgas: true, // fuel: AVGAS 100LL, JET A1 (VFR Manual AD 2.4)
       // NAV Portugal VFR Manual AD 2-LPPM (20-MAR-2025): ARP 37 08 58N
       // 008 35 02W, elevation 1 m (5 ft), MAG VAR 1 W.
       arp: ["37 08 58N", "008 35 02W"],
@@ -150,6 +152,7 @@
     // Faro: AIP Portugal LPFR AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
     LPFR: {
       name: "Faro",
+      avgas: false, // fuel: JET A1 only (AIP AD 2.4)
       arp: ["37 00 52N", "007 57 57W"],
       elevationFt: 24, // 7 m
       source: "AIP LPFR AD 2 (AIRAC 008-26)",
@@ -172,6 +175,7 @@
     // Évora: AIP Portugal LPEV AD 2.2, 2.12, 2.13 (AIRAC 008-26, 26-NOV-2026).
     LPEV: {
       name: "Évora",
+      avgas: true, // fuel: AVGAS 100/130, JET A1 (AIP AD 2.4)
       arp: ["38 31 47N", "007 53 31W"],
       elevationFt: 807, // 246 m
       source: "AIP LPEV AD 2 (AIRAC 008-26)",
@@ -191,6 +195,7 @@
     // AIP Portugal LPBJ AD 2.2, 2.12, 2.13 (AIRAC 006/007-26, 06-AUG-2026).
     LPBJ: {
       name: "Beja",
+      avgas: false, // fuel: JET A1 only (AIP AD 2.4)
       arp: ["38 04 44N", "007 55 57W"],
       elevationFt: 636, // 194 m
       source: "AIP LPBJ AD 2 (AIRAC 007-26)",
@@ -220,6 +225,7 @@
     // 2.13 (AIRAC 007-26, 01-OCT-2026).
     LPSO: {
       name: "Ponte de Sor",
+      avgas: false, // fuel: none (AIP AD 2.4)
       arp: ["39 12 42N", "008 03 28W"],
       elevationFt: 390, // 119 m
       source: "AIP LPSO AD 2 (AIRAC 007-26)",
@@ -248,6 +254,7 @@
     // 2.13 (AIRAC 006-26, 06-AUG-2026). Has a METAR and TAF.
     LPCS: {
       name: "Cascais",
+      avgas: true, // fuel: AVGAS 100LL, JET (AIP AD 2.4)
       arp: ["38 43 32N", "009 21 19W"],
       elevationFt: 326,
       source: "AIP LPCS AD 2 (AIRAC 006-26)",

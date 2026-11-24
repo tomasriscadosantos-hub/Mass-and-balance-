@@ -11,6 +11,26 @@
 
   var CHANGES = [
     {
+      id: 8,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Stops on the way",
+          text: "Plan a cross-country with landings, e.g. Évora then Ponte de Sor and back. Each stop has its " +
+            "flight time, time on the ground, alternate, and whether you refuel there.",
+        },
+        {
+          title: "Fuel leg by leg",
+          text: "Every take-off is checked with the fuel carried from the last refuelling, and the app tells " +
+            "you the least to load: e.g. at Évora, enough to get to Ponte de Sor and back.",
+        },
+        {
+          title: "Where there's AVGAS",
+          text: "Portimão, Évora and Cascais. Faro and Beja have JET A1 only, Ponte de Sor no fuel.",
+        },
+      ],
+    },
+    {
       id: 7,
       date: "2026-11-22",
       items: [

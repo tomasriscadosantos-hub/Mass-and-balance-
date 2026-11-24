@@ -83,8 +83,10 @@
 
       <fieldset class="group">
         <legend>Route</legend>
+        <div class="stops" id="stops"></div>
+        <button type="button" class="btn-ghost add-stop" id="add-stop">Add a stop on the way</button>
         <div class="field">
-          <label for="dest">Destination</label>
+          <label for="dest" id="lbl-dest">Destination</label>
           <select id="dest"></select>
         </div>
         <div class="field">
@@ -143,10 +145,12 @@
       <figure class="chart">
         <div class="chart-box" id="chart"></div>
         <figcaption class="hint">Centre of gravity moment envelope (POH section 6). The line runs from take-off
-          to landing and the alternate as fuel burns, then dashed to zero fuel.</figcaption>
+          to landing (through each stop: L1 landing, T1 take-off…) and the alternate as fuel burns, then dashed
+          to zero fuel.</figcaption>
       </figure>
       <div class="table-scroll"><table class="data" id="limits"></table></div>
       <p class="hint" id="fuel-left"></p>
+      <div class="table-scroll" id="fuel-legs-wrap" hidden><table class="data" id="fuel-legs"></table></div>
     </section>
 
     <section class="panel" aria-labelledby="h-brief">
@@ -195,7 +199,7 @@
           <li>POH corrections: −10 % for each 9 kt of headwind, +10 % for each 2 kt of tailwind (up to 10 kt). Dry grass: +15 % (take-off) or +45 % (landing) of the ground roll. Gusts count for the crosswind limit only.</li>
           <li>Obstacles after take-off, from the AIP (AD 2.10): those in the take-off path (90 m either side at the end of the runway, widening by 12.5 % of the distance, out to 6 km). You are at 50 ft at the end of the POH take-off distance (with the wind, not factored), then climb at the POH best rate of climb; ground speed = climb speed (true airspeed) less the headwind. Less than 50 ft clearance is noted; none is a limit.</li>
           <li>Pressure altitude = elevation + (1013 − QNH) × 27 ft. Density altitude = PA + 120 ft per °C above ISA.</li>
-          <li>Fuel (OM part C 2.1): taxi + trip + alternate + 45 min final reserve. Trip and alternate each include 10 min for approach and landing.</li>
+          <li>Fuel (OM part C 2.1): taxi + trip + alternate + 45 min final reserve. Trip and alternate each include 10 min for approach and landing. With stops, every leg is checked at its take-off with the fuel carried from the last refuelling, and the app says the least to load where you refuel. AVGAS is sold at LPPM, LPEV and LPCS only (AIP AD 2.4): LPFR and LPBJ have JET A1 only, LPSO no fuel.</li>
         </ul>
       </details>
     </section>

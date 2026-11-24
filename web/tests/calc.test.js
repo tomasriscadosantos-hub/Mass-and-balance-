@@ -88,6 +88,45 @@ test("limits: max weight, baggage, fuel capacity, required fuel", () => {
   assert.ok(short.problems.some((p) => p.startsWith("Fuel: 12.0 gal on board, 19.3 gal required")));
 });
 
+test("stops: fuel carried past a stop without AVGAS (LPPM-LPEV-LPSO-LPPM)", () => {
+  const ac = D.AIRCRAFT["OK-KUN"];
+  const lbh = ac.fuelFlowGph * 6; // 54 lb/h
+  const legLb = (h) => (h + 10 / 60) * lbh; // flight time + 10 min approach
+  const stops = (refuelToGal) => [
+    { label: "LPEV", tripH: 55 / 60, altH: 0.8, altLabel: "LPPM", refuelToGal },
+    { label: "LPSO", tripH: 25 / 60, altH: 0.4, altLabel: "LPEV", refuelToGal: null },
+  ];
+  const input = { loads: [75 * KG, 85 * KG, 0, 0], fuelGal: 40, solo: false, departureLabel: "LPPM",
+    destLabel: "LPPM", tripH: 80 / 60, altH: 0.3, altLabel: "LPFR" };
+  const reserve = 0.75 * lbh;
+  const need = (trip, alt) => ac.taxiFuelLb + legLb(trip) + legLb(alt) + reserve;
+
+  const full = calc.massBalance(ac, { ...input, stops: stops(40) });
+  assert.deepEqual(full.problems, []);
+  assert.deepEqual(full.conditions.map((c) => c.key),
+    ["ZFM", "Ramp", "TOM", "L1", "R1", "T1", "L2", "T2", "LM", "ALT"]);
+  // refuelled to 40 gal at LPEV; LPSO takes over what's left
+  near(full.fuel.legs[1].blockGal, 40, 1e-9, "on board at LPEV");
+  near(full.fuel.legs[2].blockGal, 40 - (ac.taxiFuelLb + legLb(25 / 60)) / 6, 1e-9, "on board at LPSO");
+  // at LPEV, load enough for both legs: the larger of LPEV-LPSO's needs and
+  // LPEV-LPSO's burn + LPSO-LPPM's needs
+  const atLpev = Math.max(need(25 / 60, 0.4), ac.taxiFuelLb + legLb(25 / 60) + need(80 / 60, 0.3)) / 6;
+  assert.deepEqual(full.fuel.fuelling.map((f) => [f.at, f.until.join(">")]), [["LPPM", "LPEV"], ["LPEV", "LPSO>LPPM"]]);
+  near(full.fuel.fuelling[1].minGal, atLpev, 1e-9, "least to load at LPEV");
+  near(full.fuel.requiredGal, need(55 / 60, 0.8) / 6, 1e-9, "least at LPPM");
+
+  // without refuelling at LPEV the last leg is short, and LPPM would need more than the tanks hold
+  const dry = calc.massBalance(ac, { ...input, stops: stops(null) });
+  assert.equal(dry.fuel.fuelling.length, 1);
+  assert.ok(dry.fuel.fuelling[0].minGal > ac.usableFuelGal);
+  assert.deepEqual(dry.fuel.legs.map((l) => l.ok), [true, true, false]);
+  assert.match(dry.problems.join(), /Fuel LPSO–LPPM: \d+\.\d gal on board at LPSO, \d+\.\d gal required/);
+
+  // refuelling past the tanks is a problem
+  assert.ok(calc.massBalance(ac, { ...input, stops: stops(45) }).problems
+    .includes("Refuel at LPEV: 45.0 gal is more than the 40 gal usable capacity"));
+});
+
 test("student solo: maximum flight time (OM A)", () => {
   const ok = run("OK-HAD", [70 * KG, 0, 0, 0], 24.5, 2.5, "LPFR", true);
   assert.ok(!ok.problems.some((p) => p.startsWith("Solo")));

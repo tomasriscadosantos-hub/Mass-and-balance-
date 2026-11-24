@@ -117,11 +117,18 @@
   }
 
   /*
-   * input: { loads: [lb per station], fuelGal, tripH, altH, altLabel, solo }
+   * input: { loads: [lb per station], fuelGal, tripH, altH, altLabel, solo,
+   *          departureLabel, destLabel, stops }
    * tripH and altH are flight times; the 10 min approach and landing
-   * allowance is added to each. Returns the loading sheet, the conditions
-   * (ZFM, Ramp, TOM, LM, ALT) with their CG limits, the fuel figures and a
-   * list of problems.
+   * allowance is added to each. stops (optional) are landings on the way,
+   * in order: [{ label, tripH (from the point before), altH, altLabel,
+   * refuelToGal (null: no fuel taken there) }]; tripH is then the last leg,
+   * from the last stop. Each leg is a flight of its own: taxi, take-off,
+   * trip, and the OM fuel (taxi + trip + alternate + final reserve) is
+   * checked at each departure with the fuel carried from the last refuelling.
+   * Returns the loading sheet, the conditions (ZFM, Ramp, TOM, LM, ALT, and
+   * for each stop k: Lk landing, Rk ramp after refuelling, Tk take-off) with
+   * their CG limits, the fuel figures and plan, and a list of problems.
    */
   function massBalance(ac, input) {
     var D = MB.data;
@@ -137,19 +144,29 @@
       m += moment;
       sheet.push({ label: label, lb: lb, arm: arm, moment: moment, subtotal: false });
     }
-    function subtotal(label, name, max) {
+    function subtotal(label, name, max, key) {
       sheet.push({ label: label, lb: w, arm: (m * 1000) / w, moment: m, subtotal: true });
-      conditions.push({ name: name, label: label, lb: w, moment: m, max: max });
+      conditions.push({ name: name, key: key || name, label: label, lb: w, moment: m, max: max });
     }
 
     var bew = basicEmpty(ac);
     var lbPerHour = ac.fuelFlowGph * D.FUEL_LB_PER_GAL;
     var approachH = D.APPROACH_MIN / 60;
     var fuelLb = input.fuelGal * D.FUEL_LB_PER_GAL;
-    var tripLb = (input.tripH + approachH) * lbPerHour;
-    var altLb = (input.altH + approachH) * lbPerHour;
     var reserveLb = (D.FINAL_RESERVE_MIN / 60) * lbPerHour;
     var plus = " + " + hhmm(approachH);
+    var gal = function (lb) {
+      return lb / D.FUEL_LB_PER_GAL;
+    };
+
+    // The legs: to each stop, then to the destination.
+    var legs = (input.stops || []).map(function (st) {
+      return { to: st.label, tripH: st.tripH, altH: st.altH, altLabel: st.altLabel,
+        refuelToGal: known(st.refuelToGal) ? st.refuelToGal : null };
+    });
+    legs.push({ to: input.destLabel || "destination", tripH: input.tripH, altH: input.altH,
+      altLabel: input.altLabel, refuelToGal: null, final: true });
+    var multi = legs.length > 1;
 
     add("Basic empty mass", bew.lb, bew.arm);
     ac.stations.forEach(function (st, i) {
@@ -159,11 +176,40 @@
     subtotal("Zero fuel mass", "ZFM", null);
     add("Fuel " + input.fuelGal.toFixed(1) + " gal", fuelLb, ac.fuelArm);
     subtotal("Ramp mass", "Ramp", ac.maxRamp);
-    add("Taxi fuel", -ac.taxiFuelLb, ac.fuelArm);
-    subtotal("Take-off mass", "TOM", ac.maxTakeoff);
-    add("Trip fuel " + hhmm(input.tripH) + plus, -tripLb, ac.fuelArm);
-    subtotal("Landing mass", "LM", ac.maxLanding);
-    add("Fuel to " + input.altLabel + " " + hhmm(input.altH) + plus, -altLb, ac.fuelArm);
+
+    var fuel = fuelLb; // on board now
+    var plan = [];
+    legs.forEach(function (leg, i) {
+      var from = i === 0 ? input.departureLabel || D.DEPARTURE : legs[i - 1].to;
+      var refuelled = i === 0;
+      if (i > 0 && legs[i - 1].refuelToGal !== null) {
+        var target = legs[i - 1].refuelToGal;
+        var addLb = Math.max(0, target * D.FUEL_LB_PER_GAL - fuel);
+        add("Refuel at " + from + " to " + target.toFixed(1) + " gal", addLb, ac.fuelArm);
+        fuel += addLb;
+        subtotal("Ramp mass at " + from, "Ramp " + from, ac.maxRamp, "R" + i);
+        refuelled = true;
+        if (target > ac.usableFuelGal + 1e-9) {
+          problems.push("Refuel at " + from + ": " + target.toFixed(1) + " gal is more than the " +
+            ac.usableFuelGal + " gal usable capacity");
+        }
+      }
+      var tripLb = (leg.tripH + approachH) * lbPerHour;
+      var altLb = (leg.altH + approachH) * lbPerHour;
+      var blockLb = fuel;
+      add(i === 0 ? "Taxi fuel" : "Taxi fuel at " + from, -ac.taxiFuelLb, ac.fuelArm);
+      fuel -= ac.taxiFuelLb;
+      if (i === 0) subtotal("Take-off mass", "TOM", ac.maxTakeoff);
+      else subtotal("Take-off mass at " + from, "TOM " + from, ac.maxTakeoff, "T" + i);
+      add("Trip fuel " + (multi ? "to " + leg.to + " " : "") + hhmm(leg.tripH) + plus, -tripLb, ac.fuelArm);
+      fuel -= tripLb;
+      if (leg.final) subtotal("Landing mass", "LM", ac.maxLanding);
+      else subtotal("Landing mass at " + leg.to, "LM " + leg.to, ac.maxLanding, "L" + (i + 1));
+      plan.push({ from: from, to: leg.to, refuelled: refuelled, altLabel: leg.altLabel, blockLb: blockLb,
+        tripLb: tripLb, altLb: altLb, requiredLb: ac.taxiFuelLb + tripLb + altLb + reserveLb, landingLb: fuel });
+    });
+    var last = plan[plan.length - 1];
+    add("Fuel to " + input.altLabel + " " + hhmm(input.altH) + plus, -last.altLb, ac.fuelArm);
     subtotal("Mass at " + input.altLabel, "ALT", ac.maxLanding);
 
     conditions.forEach(function (c) {
@@ -199,27 +245,48 @@
         ac.usableFuelGal + " gal usable capacity");
     }
 
-    // OM C 2.1: taxi + trip + alternate + final reserve; the rest is extra.
-    var requiredLb = ac.taxiFuelLb + tripLb + altLb + reserveLb;
-    var leftLb = fuelLb - ac.taxiFuelLb - tripLb - altLb;
+    // OM C 2.1, at each departure: taxi + trip + alternate + final reserve.
+    plan.forEach(function (p) {
+      p.ok = p.blockLb >= p.requiredLb - 1e-9;
+      if (p.ok) return;
+      problems.push(multi
+        ? "Fuel " + p.from + "–" + p.to + ": " + gal(p.blockLb).toFixed(1) + " gal on board at " + p.from + ", " +
+          gal(p.requiredLb).toFixed(1) + " gal required (taxi, trip, alternate " + p.altLabel + " and " +
+          D.FINAL_RESERVE_MIN + " min final reserve)"
+        : "Fuel: " + input.fuelGal.toFixed(1) + " gal on board, " + gal(p.requiredLb).toFixed(1) +
+          " gal required (taxi, trip, alternate and " + D.FINAL_RESERVE_MIN + " min final reserve)");
+    });
+    // Where fuel is loaded (the departure and each refuelling stop): the least
+    // to load there for every leg until the next refuelling.
+    var fuelling = [];
+    plan.forEach(function (p, i) {
+      if (!p.refuelled) return;
+      var burn = 0;
+      var need = 0;
+      var legsCovered = [];
+      for (var j = i; j < plan.length && (j === i || !plan[j].refuelled); j++) {
+        need = Math.max(need, burn + plan[j].requiredLb);
+        burn += ac.taxiFuelLb + plan[j].tripLb;
+        legsCovered.push(plan[j]);
+      }
+      fuelling.push({ at: p.from, leg: i, minGal: gal(need), haveGal: gal(p.blockLb),
+        until: legsCovered.map(function (l) { return l.to; }) });
+    });
+    var requiredLb = fuelling[0].minGal * D.FUEL_LB_PER_GAL;
+    var leftLb = last.landingLb - last.altLb;
     var leftMin = (leftLb / lbPerHour) * 60;
-    var gal = function (lb) {
-      return lb / D.FUEL_LB_PER_GAL;
-    };
-    if (fuelLb < requiredLb - 1e-9) {
-      problems.push("Fuel: " + input.fuelGal.toFixed(1) + " gal on board, " +
-        gal(requiredLb).toFixed(1) + " gal required (taxi, trip, alternate and " +
-        D.FINAL_RESERVE_MIN + " min final reserve)");
-    }
 
-    if (input.solo && ac.maxSoloHours && input.tripH + approachH > ac.maxSoloHours + 1e-9) {
-      problems.push("Solo: " + hhmm(input.tripH + approachH) + " planned is over the " +
+    var flownH = legs.reduce(function (sum, leg) {
+      return sum + leg.tripH + approachH;
+    }, 0);
+    if (input.solo && ac.maxSoloHours && flownH > ac.maxSoloHours + 1e-9) {
+      problems.push("Solo: " + hhmm(flownH) + " planned" + (multi ? " in all" : "") + " is over the " +
         hhmm(ac.maxSoloHours) + " maximum for a student solo flight in the " + ac.type);
     }
 
     var byName = {};
     conditions.forEach(function (c) {
-      byName[c.name] = c;
+      byName[c.key] = c;
     });
     return {
       bew: bew,
@@ -231,11 +298,17 @@
         leftGal: gal(leftLb),
         leftMin: leftMin,
         taxiGal: gal(ac.taxiFuelLb),
-        tripGal: gal(tripLb),
-        altGal: gal(altLb),
+        tripGal: gal(plan[0].tripLb),
+        altGal: gal(plan[0].altLb),
         reserveGal: gal(reserveLb),
         requiredGal: gal(requiredLb),
         extraGal: gal(fuelLb - requiredLb),
+        legs: plan.map(function (p) {
+          return { from: p.from, to: p.to, refuelled: p.refuelled, altLabel: p.altLabel, ok: p.ok,
+            blockGal: gal(p.blockLb), requiredGal: gal(p.requiredLb), tripGal: gal(p.tripLb),
+            altGal: gal(p.altLb), landingGal: gal(p.landingLb) };
+        }),
+        fuelling: fuelling,
       },
       problems: problems,
     };
