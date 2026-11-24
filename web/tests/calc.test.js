@@ -438,6 +438,45 @@ test("departure briefing in the SOP's order, filled in from the take-off", () =>
   assert.equal(brief("OK-HAD", r29, { dir: 0, kt: 0 }).get("Wind"), "calm");
 });
 
+test("landing briefing in the SOP's order, filled in from the landing", () => {
+  const land = (reg, icao, rwy, wind, opts = { rules: "om" }, contaminated = false) => {
+    const ad = D.AERODROMES[icao];
+    const ac = D.AIRCRAFT[reg];
+    const site = { icao, elevationFt: ad.elevationFt, rwy, contaminated,
+      weather: { qnh: 1013, oat: 15, gust: null, ...wind } };
+    const rep = calc.runwayCheck(ac, "landing", site, 0, opts);
+    rep.approach = calc.approachObstacles(rwy, ad.runways, ad.obstacles);
+    const b = calc.landingBriefing(ac, rep);
+    return { b, rep, get: (what) => (b.items.find((it) => it[0] === what) || [])[1] };
+  };
+  const lppm = D.AERODROMES.LPPM;
+  // OK-KUN, RWY 29 at LPPM: LDA 770, the five AIP obstacles under the approach
+  const kun = land("OK-KUN", "LPPM", lppm.runways[1], { dir: 320, kt: 12 });
+  assert.deepEqual(kun.b.items.map((it) => it[0]), ["Runway", "LDA / LDR", "Wind", "Runway surface", "Obstacles",
+    "Final approach", "Short field (POH)", "Touchdown", "200 ft AGL", "Go-around"]);
+  assert.equal(kun.get("LDA / LDR"), "770 m / " + Math.round(kun.rep.dist * 1.5) + " m");
+  assert.equal(kun.get("Wind"), "320/12, crosswind 6 kt from the right");
+  assert.equal(kun.get("Runway surface"), "paved");
+  assert.match(kun.get("Obstacles"), /^YES: natural high point 164 ft AMSL, .* before the runway \(5 under the approach\)$/);
+  assert.equal(kun.get("Final approach"), "65–75 KIAS flaps up, 60–70 KIAS flaps down");
+  assert.equal(kun.get("Short field (POH)"), "61 KIAS at 50 ft, flaps 30°");
+  assert.equal(kun.get("Touchdown"), "50–55 KIAS, not above 55");
+  assert.match(kun.get("Go-around"), /flaps 20°, 55 KIAS/);
+  assert.equal(kun.b.normal, "60–70 KIAS with flaps");
+  // OK-HAD solo on a contaminated runway: LDR is the x1.92 distance; RWY 11 has nothing under its approach
+  const solo = land("OK-HAD", "LPPM", lppm.runways[0], { dir: 0, kt: 0 }, { rules: "om", solo: true }, true);
+  assert.equal(solo.get("LDA / LDR"), "860 m / " + Math.round(solo.rep.dist * 1.92) + " m");
+  assert.equal(solo.get("Runway surface"), "paved, contaminated: braking poorer, distances longer");
+  assert.equal(solo.get("Obstacles"), "NIL in the AIP");
+  assert.equal(solo.get("Final approach"), "60–70 KIAS flaps up, 55–65 KIAS flaps down");
+  assert.equal(solo.get("Short field (POH)"), "54 KIAS at 50 ft, flaps 30°");
+  // class B: 50 ft distance within 70 % of the LDA, so LDR = 50 ft / 0.7; LPCS RWY 17 slopes down
+  const lpcs = D.AERODROMES.LPCS;
+  const cb = land("OK-HAD", "LPCS", lpcs.runways[0], { dir: 170, kt: 5 }, { rules: "classb" });
+  assert.equal(cb.get("LDA / LDR"), "1210 m / " + Math.round(cb.rep.dist / 0.7) + " m");
+  assert.equal(cb.get("Runway surface"), "paved, slopes down 0.9 %");
+});
+
 test("solo weather minima (OM C 5)", () => {
   assert.equal(calc.minimaCheck(false, 6, 1600).ok, true); // local: 5 km, 1500 ft
   assert.deepEqual(calc.minimaCheck(false, 4, 3000).problems,

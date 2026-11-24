@@ -59,6 +59,16 @@
         note: "Engine failure after take-off: the SOP says 65 KIAS flaps up, 60 flaps down; the POH says " +
           "60 KIAS, and the SOP says to follow the POH where they differ.",
       },
+      // Landing briefing: the school's C152 SOP (final approach, touchdown), the
+      // same as POH section 4; go-around from the POH balked landing.
+      arrival: {
+        source: "SOP",
+        finalUp: "60–70 KIAS",
+        finalDown: "55–65 KIAS",
+        touchdown: "50–55 KIAS, not above 55",
+        goAround: "full power, flaps 20°, 55 KIAS (POH balked landing)",
+        normal: "55–65 KIAS with flaps",
+      },
     },
     "OK-KUN": {
       type: "Cessna 172P",
@@ -104,6 +114,16 @@
         vx: [60, 65], // best angle of climb at sea level and 10,000 ft
         climbOut: "70–80 KIAS to 500 ft AGL",
         engineFailure: "65 KIAS flaps up, 60 flaps down, land straight ahead",
+      },
+      // Landing briefing: the school's C172P SOP (final approach, touchdown), the
+      // same as POH section 4; go-around from the POH balked landing.
+      arrival: {
+        source: "SOP",
+        finalUp: "65–75 KIAS",
+        finalDown: "60–70 KIAS",
+        touchdown: "50–55 KIAS, not above 55",
+        goAround: "full power, flaps 20°, 55 KIAS (POH balked landing)",
+        normal: "60–70 KIAS with flaps",
       },
     },
   };

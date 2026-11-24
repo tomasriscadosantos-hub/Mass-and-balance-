@@ -925,10 +925,14 @@
           r.approach = calc.approachObstacles(r.rwy, ad.runways, ad.obstacles);
         }
       }
-      // The SOP's departure briefing: open for the flight's own take-offs.
+      // The SOP's departure and landing briefings: open for the flight's own
+      // take-offs and landings, closed for the alternates.
       if (ev[0] === "take-off") {
         r.briefing = calc.departureBriefing(ac, r);
         r.briefing.open = ev[3] !== "Take-off at the alternate";
+      } else {
+        r.briefing = calc.landingBriefing(ac, r);
+        r.briefing.open = !/alternate/.test(ev[3]);
       }
     });
     return out;
@@ -1234,12 +1238,12 @@
     if (r.outside) {
       return html + "<p>Outside the POH table: pressure altitude or temperature too high.</p></div>";
     }
-    var normal = isTakeoff && r.briefing && r.briefing.normal;
+    var normal = r.briefing && r.briefing.normal;
     html += "<p>Short field, " + esc(r.note) + ": " + (isTakeoff
       ? "lift-off " + r.speeds[0] + " KIAS, " + r.speeds[1] + " KIAS at 50 ft"
       : r.speeds[0] + " KIAS at 50 ft") + "." + (normal
-      ? " These POH distances are for the short-field technique: a normal take-off (" + esc(r.briefing.source) +
-        ": " + esc(normal) + ") needs more runway."
+      ? " These POH distances are for the short-field technique: a normal " + (isTakeoff ? "take-off" : "approach") +
+        " (" + esc(r.briefing.source) + ": " + esc(normal) + ") needs more runway."
       : "") + "</p>";
     html += "<p>POH, zero wind, paved: ground roll " + n(r.poh.roll, 0) + " ft, 50 ft " + n(r.poh.total, 0) +
       " ft. Corrections: " + esc(r.corrections.join(", ")) + ".</p>";
@@ -1259,17 +1263,24 @@
     return html + obstaclesHtml(r) + approachHtml(r) + briefingHtml(r) + "</div>";
   }
 
-  // The SOP's departure crew briefing, filled in from the take-off above.
+  // The SOP's departure crew briefing or arrival briefing, filled in from the
+  // take-off or landing above.
   function briefingHtml(r) {
     var b = r.briefing;
     if (!b) return "";
+    var isTakeoff = r.kind === "take-off";
     var from = b.source === "SOP" ? "Speeds from the school's SOP and the POH."
       : "Speeds from the POH: the school's SOP for this aircraft isn't in the app yet.";
-    return '<details class="dep-brief"' + (b.open ? " open" : "") + "><summary>Departure briefing</summary>" +
+    var yours = isTakeoff
+      ? "Add the turn after departure, the initial altitude and who takes control in an emergency."
+      : "Add the airspace, the circuit entry and altitude, the traffic, wind shear, noise abatement and " +
+        "the runway exit, and check the NOTAMs.";
+    return '<details class="dep-brief"' + (b.open ? " open" : "") + "><summary>" +
+      (isTakeoff ? "Departure briefing" : "Landing briefing") + "</summary>" +
       "<dl>" + b.items.map(function (it) {
         return "<dt>" + esc(it[0]) + "</dt><dd>" + esc(it[1]) + "</dd>";
-      }).join("") + '</dl><p class="hint">' + esc(from) + (b.note ? " " + esc(b.note) : "") +
-      " Add the turn after departure, the initial altitude and who takes control in an emergency.</p></details>";
+      }).join("") + '</dl><p class="hint">' + esc(from) + (b.note ? " " + esc(b.note) : "") + " " + esc(yours) +
+      "</p></details>";
   }
 
   // "700 m", "2.2 km, 200 m left", with * where the AIP gives no position.

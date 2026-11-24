@@ -11,6 +11,20 @@
 
   var CHANGES = [
     {
+      id: 12,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Landing briefing",
+          text: "Every landing now ends with a briefing in the order of the SOP's arrival briefing: runway, " +
+            "LDA and the distance you need, wind and crosswind, runway surface, obstacles under the approach, " +
+            "then the SOP approach speeds (flaps up and down), touchdown 50–55 KIAS, the 200 ft stabilized " +
+            "call and the go-around. The landing results also say that a normal approach needs more runway " +
+            "than the POH's short-field figures.",
+        },
+      ],
+    },
+    {
       id: 11,
       date: "2026-11-24",
       items: [

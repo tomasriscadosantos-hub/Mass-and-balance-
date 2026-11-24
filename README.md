@@ -44,6 +44,14 @@ failure after take-off in the 152 the app gives the POH's 60 KIAS: the C152 SOP 
 60 flaps down, and the SOP says the POH applies where they differ. The take-off results also say that the POH distances are for the short-field
 technique (flaps 10°), so a normal take-off needs more runway.
 
+Under every landing there is a **landing briefing** in the order of the SOP's arrival briefing:
+runway, LDA / LDR, wind and crosswind, runway surface (contaminated, slope), obstacles under the
+approach (the highest one the AIP lists), then the SOP speeds: final approach (152: 60–70 KIAS flaps
+up, 55–65 flaps down; 172: 65–75 and 60–70, the same as POH section 4), the POH short-field speed,
+touchdown 50–55 KIAS, the 200 ft AGL stabilized call and the go-around (POH balked landing: full
+power, flaps 20°, 55 KIAS). The speeds are in `arrival` for each aircraft in `js/data.js`. The landing
+results also say that a normal approach needs more runway than the POH short-field figures.
+
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
 LDA) is still there as an option. The alternate leg is measured from the destination, using the
 aerodrome reference points in `js/data.js`. LPPM's position and elevation come from NAV Portugal's sunrise/sunset tables. LPFR and LPBJ coordinates

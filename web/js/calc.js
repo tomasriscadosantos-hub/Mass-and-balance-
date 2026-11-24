@@ -534,6 +534,7 @@
       icao: site.icao,
       rwy: rwy,
       noRunway: noRunway,
+      contaminated: !!site.contaminated,
       mass: mass,
       massNote: massNote,
       weather: wx,
@@ -967,23 +968,9 @@
     }
     items.push(["Obstacles", obsText]);
 
-    var gust = known(wx.gust);
-    var wind = !wx.kt ? "calm" : pad0(wx.dir, 3) + "/" + pad0(wx.kt, 2) + (gust ? "G" + pad0(wx.gust, 2) : "");
-    var side = null;
-    if (!report.noRunway && wx.kt) {
-      var sin = Math.sin(((wx.dir - runwayBearing(rwy)) * Math.PI) / 180);
-      if (Math.abs(sin * wx.kt) >= 0.5) side = sin > 0 ? "right" : "left";
-    }
-    var windText = wind;
-    if (!report.noRunway && wx.kt) {
-      windText += side
-        ? ", crosswind " + Math.round(report.cross) + " kt from the " + side +
-          (gust && Math.round(report.gustCross) > Math.round(report.cross) ? " (" + Math.round(report.gustCross) + " in gusts)" : "")
-        : ", no crosswind";
-      if (report.head <= -0.5) windText += ", tailwind " + Math.round(-report.head) + " kt";
-    }
-    items.push(["Wind", windText]);
-    items.push(["Ailerons", report.noRunway ? "into the wind" : side ? side + ", into the wind, on the ground roll" : "neutral"]);
+    var w = windBrief(report);
+    items.push(["Wind", w.text]);
+    items.push(["Ailerons", report.noRunway ? "into the wind" : w.side ? w.side + ", into the wind, on the ground roll" : "neutral"]);
 
     if (known(s.vr)) items.push(["Vr", s.vr + " KIAS"]);
     var vy = climbSpeed(ac.perf, report.pa);
@@ -992,6 +979,89 @@
     if (s.climbOut) items.push(["Climb", s.climbOut]);
     if (s.engineFailure) items.push(["Engine failure after take-off", s.engineFailure]);
     return { items: items, source: s.source || null, normal: s.normal || null, note: s.note || null };
+  }
+
+  // "320/12G18, crosswind 6 kt from the right (9 in gusts), tailwind 2 kt" and the crosswind side.
+  function windBrief(report) {
+    var wx = report.weather;
+    var gust = known(wx.gust);
+    var text = !wx.kt ? "calm" : pad0(wx.dir, 3) + "/" + pad0(wx.kt, 2) + (gust ? "G" + pad0(wx.gust, 2) : "");
+    var side = null;
+    if (!report.noRunway && wx.kt) {
+      var sin = Math.sin(((wx.dir - runwayBearing(report.rwy)) * Math.PI) / 180);
+      if (Math.abs(sin * wx.kt) >= 0.5) side = sin > 0 ? "right" : "left";
+      text += side
+        ? ", crosswind " + Math.round(report.cross) + " kt from the " + side +
+          (gust && Math.round(report.gustCross) > Math.round(report.cross) ? " (" + Math.round(report.gustCross) + " in gusts)" : "")
+        : ", no crosswind";
+      if (report.head <= -0.5) text += ", tailwind " + Math.round(-report.head) + " kt";
+    }
+    return { text: text, side: side };
+  }
+
+  /*
+   * The landing briefing, in the order of the school's SOP (arrival briefing,
+   * then the landing speeds), for a landing report from runwayCheck, with
+   * report.approach from approachObstacles where the runway is known. The
+   * speeds come from ac.arrival. Returns { items: [[what, text], ...], source, normal }.
+   */
+  function landingBriefing(ac, report) {
+    var s = ac.arrival || {};
+    var rwy = report.rwy;
+    var items = [["Runway", report.noRunway ? "not in the data" : rwy.rwy]];
+
+    // LDR: the largest distance the rules compare with the LDA (as a share of it for "70 % LDA").
+    var ldr = null;
+    (report.lines || []).forEach(function (l) {
+      var m = /^(\d+) % LDA$/.exec(l.name);
+      var need = m ? (l.need * 100) / Number(m[1]) : l.name === "LDA" ? l.need : null;
+      if (need !== null && (ldr === null || need > ldr)) ldr = need;
+    });
+    var lda = report.noRunway ? null : rwy.lda;
+    items.push(["LDA / LDR", (known(lda) ? Math.round(lda) + " m" : "–") + " / " +
+      (report.outside ? "outside the POH table" : ldr === null ? "–" : Math.round(ldr) + " m")]);
+
+    items.push(["Wind", windBrief(report).text]);
+
+    if (!report.noRunway) {
+      var surface = known(rwy.surface) ? rwy.surface : "surface not in the data";
+      if (report.contaminated) surface += ", contaminated: braking poorer, distances longer";
+      if (known(rwy.slopePct) && Math.abs(rwy.slopePct) >= 0.1) {
+        surface += ", slopes " + (rwy.slopePct < 0 ? "down" : "up") + " " + Math.abs(rwy.slopePct).toFixed(1) + " %";
+      }
+      items.push(["Runway surface", surface]);
+    }
+
+    // Terrain / obstacles: the highest one the AIP lists under the approach.
+    var ap = report.approach;
+    var apText;
+    if (!ap || report.noRunway) {
+      apText = "not checked here";
+    } else if (!ap.length) {
+      apText = "NIL in the AIP";
+    } else {
+      var top = ap.reduce(function (a, b) {
+        if (!known(b.ob.elevFt)) return a;
+        return !known(a.ob.elevFt) || b.ob.elevFt > a.ob.elevFt ? b : a;
+      }, ap[0]);
+      var what = top.ob.what.charAt(0).toLowerCase() + top.ob.what.slice(1);
+      var d = top.along >= 1000 ? (top.along / 1000).toFixed(1) + " km" : Math.round(top.along / 10) * 10 + " m";
+      apText = "YES: " + what + (known(top.ob.elevFt) ? " " + Math.round(top.ob.elevFt) + " ft AMSL" : "") + ", " + d +
+        " before the runway" + (ap.length > 1 ? " (" + ap.length + " under the approach)" : "");
+    }
+    items.push(["Obstacles", apText]);
+
+    if (s.finalUp || s.finalDown) {
+      items.push(["Final approach", [s.finalUp && s.finalUp + " flaps up", s.finalDown && s.finalDown + " flaps down"]
+        .filter(Boolean).join(", ")]);
+    }
+    if (report.speeds && known(report.speeds[0])) {
+      items.push(["Short field (POH)", report.speeds[0] + " KIAS at 50 ft, flaps 30°"]);
+    }
+    if (s.touchdown) items.push(["Touchdown", s.touchdown]);
+    items.push(["200 ft AGL", "stabilized: continue; not stabilized: go around"]);
+    if (s.goAround) items.push(["Go-around", s.goAround]);
+    return { items: items, source: s.source || null, normal: s.normal || null };
   }
 
   // Best rate of climb at the departure (POH, maximum weight).
@@ -1027,6 +1097,7 @@
     obstacleClearance: obstacleClearance,
     climbSpeed: climbSpeed,
     departureBriefing: departureBriefing,
+    landingBriefing: landingBriefing,
     minimaCheck: minimaCheck,
     parseMetar: parseMetar,
     sunTimes: sunTimes,
