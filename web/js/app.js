@@ -1687,8 +1687,10 @@
         }
         html += '<p class="wx-raw">' + esc(metar.raw) + "</p>";
         if (taf) {
-          html += "<details><summary>TAF " + metar.icao + ", issued " + esc(utcTime(taf.issued)) +
-            '</summary><p class="wx-raw">' + esc(taf.raw) + "</p></details>";
+          var tafHead = "TAF " + metar.icao + ", issued " + esc(utcTime(taf.issued));
+          html += "<details><summary>" + tafHead + '</summary><p class="wx-raw">' + esc(taf.raw) + "</p></details>" +
+            // printed open (a closed <details> doesn't print its content)
+            '<div class="print-only"><p class="hint">' + tafHead + '</p><p class="wx-raw">' + esc(taf.raw) + "</p></div>";
         }
         if (own) {
           html += '<button type="button" class="btn-ghost" data-fill="' + icao + '" data-from="' + metar.icao +

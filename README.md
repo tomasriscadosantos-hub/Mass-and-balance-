@@ -55,9 +55,9 @@ results also say that a normal approach needs more runway than the POH short-fie
 **Print.** The Print button under the result (or the browser's own print) gives an A4 sheet in
 light colours, also in dark mode: a header with the aircraft, date, take-off time, route, flight
 times, alternates, fuel and the rules used, then the result, loading sheet, CG chart and limits, fuel
-by leg and the performance with the open briefings, and lines for the pilot in command, signature and
-instructor. The inputs, buttons, weather downloads and method notes are left out (the weather used is
-in each performance line). A local flight with an alternate is three pages. The print layout is the
+by leg, the METARs, TAFs and IPMA station readings for the route (TAFs printed open), the performance
+with the open briefings, and lines for the pilot in command, signature and instructor. The inputs,
+buttons, NOTAM link and method notes are left out. A local flight with an alternate is four pages. The print layout is the
 `@media print` block at the end of `styles.css`.
 
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of

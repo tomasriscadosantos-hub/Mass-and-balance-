@@ -588,7 +588,7 @@ dialog.sheet::backdrop {
    colours, without the inputs, buttons, weather downloads and method notes.
    The header and the signature lines are printed only. */
 .summary-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.print-head, .print-sign { display: none; }
+.print-head, .print-sign, .print-only { display: none; }
 
 @media print {
   @page { size: A4; margin: 12mm 12mm 14mm; }
@@ -617,19 +617,22 @@ dialog.sheet::backdrop {
   html, body { background: #ffffff !important; color: #000000; }
   body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-  .topbar, .col-inputs, .foot, dialog, .summary-actions, .perf-method, .ad-inputs, .obstacle, .missing,
-  details.method, .error, section[aria-labelledby="h-brief"], details.dep-brief:not([open]),
-  .panel-head .link-btn { display: none !important; }
+  .topbar, .col-inputs, .foot, dialog, .summary-actions, .perf-method, .ad-inputs, .obstacle, .aerodrome .missing,
+  details.method, .error, details.dep-brief:not([open]), .panel-head .link-btn,
+  .wx-buttons, .wx-report button, .wx-report details, .wx-status, .notams { display: none !important; }
+  .print-only { display: block; }
 
   /* Plain blocks: grid containers break badly across pages. Long reports may
      run onto the next page; the chart, briefings and table rows stay whole. */
-  .wrap, .col-results, .panel, #aerodromes, .aerodrome, .reports, .report, .chart { display: block; }
+  .wrap, .col-results, .panel, #aerodromes, .aerodrome, .reports, .report, .chart, .briefing, .wx-report { display: block; }
   .wrap { max-width: none; padding: 0; }
   .col-results > * + *, .panel > * + *, .aerodrome > * + *, .reports > * + *, .report > * + *,
-  .chart > * + * { margin-top: 6px; }
+  .chart > * + *, .briefing > * + *, .wx-report > * + *, .print-only > * + * { margin-top: 6px; }
+  .wx-report { padding: 8px 10px; }
+  .wx-raw { font-size: 0.85rem; }
   .panel { padding: 10px 12px; border-radius: 6px; }
   .table-scroll { overflow: visible; }
-  .chart, .figures, .verdict, .issues li, .dep-brief, table.data tr, .obs-list li { break-inside: avoid; }
+  .chart, .figures, .verdict, .issues li, .dep-brief, table.data tr, .obs-list li, .wx-report { break-inside: avoid; }
   h2, .panel-head, .aerodrome-head, .report-head, .facts, .obs-title, .dep-brief summary { break-after: avoid; }
   .chart-box { min-height: 0; width: 50%; margin: 0 auto; }
   .dep-brief summary { min-height: 0; padding: 2px 0; list-style: none; }

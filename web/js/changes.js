@@ -11,6 +11,17 @@
 
   var CHANGES = [
     {
+      id: 14,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "METAR and TAF in the printout",
+          text: "The printout now has the weather for your route: the IPMA station readings, METARs and TAFs " +
+            "(the TAFs printed in full), with their times. Download the latest weather before you print.",
+        },
+      ],
+    },
+    {
       id: 13,
       date: "2026-11-24",
       items: [
