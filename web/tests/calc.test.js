@@ -394,6 +394,46 @@ test("obstacle clearance: 50 ft at the take-off distance, then the POH climb", (
   assert.match(capped.problems[0], /Tower \(400 ft\) 1852 m beyond the runway not cleared \(-50 ft\)/);
 });
 
+test("departure briefing in the SOP's order, filled in from the take-off", () => {
+  const ad = D.AERODROMES.LPPM;
+  const [r11, r29] = ad.runways;
+  const brief = (reg, rwy, wind) => {
+    const ac = D.AIRCRAFT[reg];
+    const site = { icao: "LPPM", elevationFt: 5, rwy, weather: { qnh: 1013, oat: 15, gust: null, ...wind } };
+    const rep = calc.runwayCheck(ac, "take-off", site, 0, { rules: "om" });
+    rep.obstacles = calc.obstacleClearance(ac, site, rep, calc.takeoffObstacles(rwy, ad.obstacles));
+    const b = calc.departureBriefing(ac, rep);
+    return { b, rep, get: (what) => (b.items.find((it) => it[0] === what) || [])[1] };
+  };
+  // OK-KUN, RWY 29, wind 320/12: from the right, no obstacles in the AIP
+  const kun = brief("OK-KUN", r29, { dir: 320, kt: 12 });
+  assert.deepEqual(kun.b.items.map((it) => it[0]),
+    ["Departure", "Runway", "TORA / TORR", "Obstacles", "Wind", "Ailerons", "Vr", "Vy / Vx", "Climb", "Engine failure after take-off"]);
+  assert.equal(kun.b.source, "SOP");
+  assert.equal(kun.get("Runway"), "29");
+  assert.equal(kun.get("TORA / TORR"), "860 m / " + Math.round(kun.rep.dist * 1.5) + " m");
+  assert.equal(kun.get("Obstacles"), "NIL in the AIP");
+  assert.equal(kun.get("Wind"), "320/12, crosswind 6 kt from the right");
+  assert.equal(kun.get("Ailerons"), "right, into the wind, on the ground roll");
+  assert.equal(kun.get("Vr"), "55 KIAS");
+  assert.equal(kun.get("Vy / Vx"), "76 / 60 KIAS");
+  assert.equal(kun.get("Engine failure after take-off"), "65 KIAS flaps up, 60 flaps down, land straight ahead");
+  // RWY 11, wind 080/10: from the left; the AIP obstacles ahead, the closest call named
+  const k11 = brief("OK-KUN", r11, { dir: 80, kt: 10 });
+  assert.equal(k11.get("Ailerons"), "left, into the wind, on the ground roll");
+  const known = k11.rep.obstacles.rows.filter((r) => r.clearance !== undefined);
+  const least = Math.min(...known.map((r) => r.clearance));
+  assert.match(k11.get("Obstacles"), new RegExp("^YES: .*cleared by " + Math.round(least) + " ft \\(5 in the take-off path\\)$"));
+  // OK-HAD: POH speeds; tailwind and calm
+  const had = brief("OK-HAD", r29, { dir: 110, kt: 5 });
+  assert.equal(had.b.source, "POH");
+  assert.equal(had.get("Vr"), "50 KIAS");
+  assert.equal(had.get("Vy / Vx"), "67 / 55 KIAS");
+  assert.equal(had.get("Wind"), "110/05, no crosswind, tailwind 5 kt");
+  assert.equal(had.get("Ailerons"), "neutral");
+  assert.equal(brief("OK-HAD", r29, { dir: 0, kt: 0 }).get("Wind"), "calm");
+});
+
 test("solo weather minima (OM C 5)", () => {
   assert.equal(calc.minimaCheck(false, 6, 1600).ok, true); // local: 5 km, 1500 ft
   assert.deepEqual(calc.minimaCheck(false, 4, 3000).problems,

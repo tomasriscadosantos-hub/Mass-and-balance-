@@ -44,6 +44,17 @@
       cgAft: 36.5,
       envelopeMinLb: 1000, // bottom of the POH envelope chart
       maxSoloHours: 3, // OM A: longest uninterrupted student solo flight
+      // Departure briefing. No school SOP for the 152 in the app yet, so from
+      // the POH: section 4 (normal take-off, speeds) and section 3 (engine
+      // failure immediately after take-off).
+      departure: {
+        source: "POH",
+        normal: "flaps 0–10°, nose wheel up at 50 KIAS, climb 65–75 KIAS",
+        vr: 50,
+        vx: [55, 55], // best angle of climb at sea level and 10,000 ft
+        climbOut: "65–75 KIAS",
+        engineFailure: "60 KIAS",
+      },
     },
     "OK-KUN": {
       type: "Cessna 172P",
@@ -79,6 +90,17 @@
       cgAft: 47.3,
       envelopeMinLb: 1500,
       maxSoloHours: 3.5,
+      // Departure briefing: the school's C172P SOP (take-off, after take-off,
+      // engine failure immediately after take-off); best angle of climb from
+      // POH section 4.
+      departure: {
+        source: "SOP",
+        normal: "flaps 0°, rotate 55 KIAS, climb 70–80 KIAS",
+        vr: 55,
+        vx: [60, 65], // best angle of climb at sea level and 10,000 ft
+        climbOut: "70–80 KIAS to 500 ft AGL",
+        engineFailure: "65 KIAS flaps up, 60 flaps down, land straight ahead",
+      },
     },
   };
 

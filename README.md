@@ -34,6 +34,15 @@ It follows the Flying Academy Operations Manual (Rev. 1, Sep 2024):
 | Stops on the way | C 2.1 | A route can have up to 4 landings before the destination (e.g. LPPM → LPEV → LPSO → LPPM), each with its flight time, time on the ground (default 30 min), alternate (default: back where the leg started) and whether you refuel there (only where AIP AD 2.4 lists AVGAS: LPPM, LPEV, LPCS). Every leg is checked at its take-off: taxi + trip + alternate + 45 min reserve, with the fuel carried from the last refuelling. The app says the least to load at each place you refuel, and checks mass and CG at every take-off and landing. The daylight check adds the legs and ground times; the solo maximum flight time counts all legs. |
 | Daylight | A (risk register) | Sunset at the destination, worked out from its position and the date. Cross-country flights land 30 min before sunset. With a take-off time (UTC) it checks the planned landing, warns if a diversion to the alternate would land after sunset, and warns about a take-off before sunrise. It also shows when night starts (end of civil twilight). Sun times are within 2 min of NAV Portugal's sunrise/sunset tables. |
 
+Under every take-off it also gives the **departure briefing** in the order of the school's C172P SOP
+(departure crew briefing): runway, TORA / TORR, obstacles (yes, naming the one cleared by the least,
+or nil), wind and crosswind, which way to hold the ailerons, Vr, Vy / Vx, climb speed and the
+engine-failure speed. The speeds are in `departure` for each aircraft in `js/data.js`: the SOP for
+the 172 (rotate 55 KIAS, climb 70–80 KIAS to 500 ft AGL, engine failure 65 KIAS flaps up / 60 flaps
+down), the POH for the 152 until its SOP is in the app (nose wheel up at 50 KIAS, climb 65–75 KIAS,
+engine failure 60 KIAS). The take-off results also say that the POH distances are for the short-field
+technique (flaps 10°), so a normal take-off needs more runway.
+
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
 LDA) is still there as an option. The alternate leg is measured from the destination, using the
 aerodrome reference points in `js/data.js`. LPPM's position and elevation come from NAV Portugal's sunrise/sunset tables. LPFR and LPBJ coordinates

@@ -423,6 +423,31 @@ table.data tr.minus td { color: var(--muted); }
 table.data.obs .sub { display: block; font: 400 0.75rem var(--font-data); color: var(--muted); }
 table.data.obs td.status { width: 1%; }
 .report details.method { margin-top: 4px; }
+.dep-brief { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--line); display: grid; gap: 6px; min-width: 0; }
+.dep-brief summary {
+  cursor: pointer;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  font: 700 0.75rem var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.dep-brief dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: fit-content(9em) minmax(0, 1fr);
+  gap: 5px 14px;
+  font-size: var(--step--1);
+}
+.dep-brief dt { color: var(--muted); }
+.dep-brief .hint { margin-top: 4px; }
+.dep-brief dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+@media (max-width: 360px) {
+  .dep-brief dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .dep-brief dd { margin-bottom: 6px; }
+}
 
 .briefing { display: grid; gap: 10px; min-width: 0; }
 .wx-updated { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;

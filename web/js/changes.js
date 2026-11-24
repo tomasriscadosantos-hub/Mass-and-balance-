@@ -11,6 +11,23 @@
 
   var CHANGES = [
     {
+      id: 10,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Departure briefing",
+          text: "Every take-off now ends with the briefing in the SOP's order: runway, TORA and the distance " +
+            "you need, obstacles, wind and crosswind, which way to hold the ailerons, Vr, Vy/Vx, climb speed " +
+            "and the engine-failure speed. You add the turn after departure and the initial altitude.",
+        },
+        {
+          title: "Short-field figures",
+          text: "The take-off distances are the POH's short-field figures (flaps 10°). The app now says so: a " +
+            "normal take-off (172 SOP: flaps 0°, rotate 55 KIAS) needs more runway.",
+        },
+      ],
+    },
+    {
       id: 9,
       date: "2026-11-24",
       items: [
