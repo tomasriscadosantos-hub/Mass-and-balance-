@@ -709,7 +709,7 @@
 
     // Fuel to load where there's fuel, when it has to last past stops without.
     result.mb.fuel.fuelling.forEach(function (fp) {
-      if (fp.until.length < 2) return;
+      if (fp.until.length < 2 || fp.overCapacity) return; // over the tanks: a limit already says so
       var dry = fp.until.slice(0, -1).map(function (icao) {
         var st = stops.filter(function (x) { return x.icao === icao; })[0];
         return st && !st.avgas ? "no AVGAS at " + icao : "no refuelling at " + icao;
@@ -1082,8 +1082,11 @@
     $("fuel-legs-wrap").hidden = f.legs.length < 2;
     if (f.legs.length > 1) {
       $("fuel-left").textContent = f.fuelling.map(function (fp) {
-        return "Load at least " + n(fp.minGal, 1) + " gal at " + fp.at + " (for " + fp.at + " → " +
-          fp.until.join(" → ") + ")";
+        var route = fp.at + " → " + fp.until.join(" → ");
+        return fp.overCapacity
+          ? route + " needs " + n(fp.minGal, 1) + " gal at " + fp.at + ", more than the " + r.ac.usableFuelGal +
+            " gal the tanks hold"
+          : "Load at least " + n(fp.minGal, 1) + " gal at " + fp.at + " (for " + route + ")";
       }).join(". ") + ". At each take-off the OM fuel is taxi + trip + alternate + " + D.FINAL_RESERVE_MIN +
         " min, each with 10 min for the approach. Left at " + altLabel + " at the end: " + n(f.leftGal, 1) +
         " gal, about " + n(f.leftMin, 0) + " min.";

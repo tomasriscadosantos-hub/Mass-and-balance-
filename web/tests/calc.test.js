@@ -127,6 +127,34 @@ test("stops: fuel carried past a stop without AVGAS (LPPM-LPEV-LPSO-LPPM)", () =
     .includes("Refuel at LPEV: 45.0 gal is more than the 40 gal usable capacity"));
 });
 
+test("stops: more fuel than the tanks hold is a limit, not a note (C152, 24.5 gal)", () => {
+  const ac = D.AIRCRAFT["OK-HAD"];
+  const A = D.AERODROMES;
+  const t = (a, b) => calc.distanceNm(A[a], A[b]) / ac.cruiseKt;
+  const plan = (finalAlt, lastLegH) => calc.massBalance(ac, {
+    loads: [60 * KG, 0, 0, 0], fuelGal: 24.5, solo: false, departureLabel: "LPPM", destLabel: "LPPM",
+    tripH: lastLegH || t("LPSO", "LPPM"), altH: t("LPPM", finalAlt), altLabel: finalAlt,
+    stops: [
+      { label: "LPEV", tripH: t("LPPM", "LPEV"), altH: t("LPEV", "LPPM"), altLabel: "LPPM", refuelToGal: 24.5 },
+      { label: "LPSO", tripH: t("LPEV", "LPSO"), altH: t("LPSO", "LPEV"), altLabel: "LPEV", refuelToGal: null },
+    ],
+  });
+  const fuelProblems = (mb) => mb.problems.filter((p) => p.startsWith("Fuel"));
+  // Each leg fits in the tanks, but LPEV -> LPSO -> LPPM together don't
+  const far = plan("LPEV");
+  assert.equal(far.fuel.fuelling[1].overCapacity, true);
+  assert.ok(fuelProblems(far).some((p) => /^Fuel LPEV → LPSO → LPPM: needs at least \d+\.\d gal at LPEV, more than the 24\.5 gal usable in the Cessna 152's tanks, so it can't be flown without refuelling on the way \(AVGAS at LPPM, LPEV, LPCS\)/.test(p)));
+  // With Faro, much nearer to Portimão, as the last alternate it can be flown
+  const near = plan("LPFR");
+  assert.deepEqual(fuelProblems(near), []);
+  assert.equal(near.fuel.fuelling[1].overCapacity, false);
+  // One leg alone needing more than full tanks says so (and not the whole-trip message too)
+  const long = plan("LPEV", 2.0); // a 2:00 last leg needs more than full tanks
+  const fp = fuelProblems(long);
+  assert.ok(fp.some((p) => /^Fuel LPSO–LPPM: needs \d+\.\d gal \(taxi, trip, alternate LPEV and 45 min final reserve\), more than the 24\.5 gal usable in the Cessna 152's tanks: plan a shorter leg or a nearer alternate$/.test(p)));
+  assert.ok(!fp.some((p) => p.startsWith("Fuel LPEV → LPSO → LPPM")));
+});
+
 test("student solo: maximum flight time (OM A)", () => {
   const ok = run("OK-HAD", [70 * KG, 0, 0, 0], 24.5, 2.5, "LPFR", true);
   assert.ok(!ok.problems.some((p) => p.startsWith("Solo")));

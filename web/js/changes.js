@@ -11,6 +11,21 @@
 
   var CHANGES = [
     {
+      id: 9,
+      date: "2026-11-24",
+      items: [
+        {
+          title: "Fuel past what the tanks hold",
+          text: "When a route needs more fuel than the tanks hold (24.5 gal in the 152, 40 in the 172), it's " +
+            "now a limit that says so, with what to change: a nearer alternate or a refuelling stop.",
+        },
+        {
+          title: "Left column scrolls on its own",
+          text: "On an iPad, the inputs scroll separately from the results.",
+        },
+      ],
+    },
+    {
       id: 8,
       date: "2026-11-24",
       items: [

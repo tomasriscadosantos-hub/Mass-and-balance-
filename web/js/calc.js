@@ -246,15 +246,29 @@
     }
 
     // OM C 2.1, at each departure: taxi + trip + alternate + final reserve.
+    var capLb = ac.usableFuelGal * D.FUEL_LB_PER_GAL;
+    var tanks = ac.usableFuelGal + " gal usable in the " + ac.type + "'s tanks";
+    var avgasAt = Object.keys(D.AERODROMES || {}).filter(function (k) {
+      return D.AERODROMES[k].avgas;
+    }).join(", ");
     plan.forEach(function (p) {
       p.ok = p.blockLb >= p.requiredLb - 1e-9;
+      p.overCapacity = p.requiredLb > capLb + 1e-9;
       if (p.ok) return;
-      problems.push(multi
-        ? "Fuel " + p.from + "–" + p.to + ": " + gal(p.blockLb).toFixed(1) + " gal on board at " + p.from + ", " +
-          gal(p.requiredLb).toFixed(1) + " gal required (taxi, trip, alternate " + p.altLabel + " and " +
-          D.FINAL_RESERVE_MIN + " min final reserve)"
-        : "Fuel: " + input.fuelGal.toFixed(1) + " gal on board, " + gal(p.requiredLb).toFixed(1) +
-          " gal required (taxi, trip, alternate and " + D.FINAL_RESERVE_MIN + " min final reserve)");
+      var parts = "taxi, trip, alternate " + (multi ? p.altLabel + " " : "") + "and " + D.FINAL_RESERVE_MIN +
+        " min final reserve";
+      if (p.overCapacity) {
+        // More than the tanks hold: loading more can't fix it.
+        problems.push("Fuel" + (multi ? " " + p.from + "–" + p.to : "") + ": needs " +
+          gal(p.requiredLb).toFixed(1) + " gal (" + parts + "), more than the " + tanks +
+          ": plan a shorter leg or a nearer alternate");
+      } else {
+        problems.push(multi
+          ? "Fuel " + p.from + "–" + p.to + ": " + gal(p.blockLb).toFixed(1) + " gal on board at " + p.from + ", " +
+            gal(p.requiredLb).toFixed(1) + " gal required (" + parts + ")"
+          : "Fuel: " + input.fuelGal.toFixed(1) + " gal on board, " + gal(p.requiredLb).toFixed(1) +
+            " gal required (" + parts + ")");
+      }
     });
     // Where fuel is loaded (the departure and each refuelling stop): the least
     // to load there for every leg until the next refuelling.
@@ -269,8 +283,18 @@
         burn += ac.taxiFuelLb + plan[j].tripLb;
         legsCovered.push(plan[j]);
       }
-      fuelling.push({ at: p.from, leg: i, minGal: gal(need), haveGal: gal(p.blockLb),
-        until: legsCovered.map(function (l) { return l.to; }) });
+      var fp = { at: p.from, leg: i, minGal: gal(need), haveGal: gal(p.blockLb),
+        until: legsCovered.map(function (l) { return l.to; }), overCapacity: need > capLb + 1e-9 };
+      fuelling.push(fp);
+      // The legs together need more than the tanks hold, though each fits
+      // alone: there has to be a refuelling between them.
+      var eachFits = legsCovered.every(function (l) { return !l.overCapacity; });
+      if (fp.overCapacity && legsCovered.length > 1 && eachFits) {
+        problems.push("Fuel " + p.from + " → " + fp.until.join(" → ") + ": needs at least " +
+          fp.minGal.toFixed(1) + " gal at " + p.from + ", more than the " + tanks +
+          ", so it can't be flown without refuelling on the way (AVGAS at " + avgasAt + ") or a nearer " +
+          "alternate");
+      }
     });
     var requiredLb = fuelling[0].minGal * D.FUEL_LB_PER_GAL;
     var leftLb = last.landingLb - last.altLb;
