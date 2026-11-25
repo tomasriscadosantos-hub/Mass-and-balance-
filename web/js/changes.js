@@ -11,6 +11,17 @@
 
   var CHANGES = [
     {
+      id: 17,
+      date: "2026-11-25",
+      items: [
+        {
+          title: "Typing the weather",
+          text: "The weather fields (QNH, OAT, wind, gust, visibility, ceiling) lost the cursor after each " +
+            "character, so you had to tap the field again. They now keep it while you type.",
+        },
+      ],
+    },
+    {
       id: 16,
       date: "2026-11-25",
       items: [

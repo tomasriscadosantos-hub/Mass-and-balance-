@@ -1689,8 +1689,17 @@
       $("ad-" + icao).hidden = !perf || perf.involved.indexOf(icao) < 0;
     });
     if (!perf) return;
+    // Keep the cards in route order, moving one only when it's out of place:
+    // moving a card takes the focus (and the iPad keyboard) away from the
+    // field being typed in, after every character.
+    var prev = null;
     perf.involved.forEach(function (icao) {
-      container.appendChild($("ad-" + icao)); // keep the cards in route order
+      var el = $("ad-" + icao);
+      var spot = prev ? prev.nextElementSibling : container.firstElementChild;
+      if (el !== spot) container.insertBefore(el, spot);
+      prev = el;
+    });
+    perf.involved.forEach(function (icao) {
       var card = perf.cards[icao];
       $("roles-" + icao).textContent = perf.roles[icao].join(" · ");
       var missing = $("missing-" + icao);
