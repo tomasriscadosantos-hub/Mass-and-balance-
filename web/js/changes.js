@@ -11,6 +11,23 @@
 
   var CHANGES = [
     {
+      id: 16,
+      date: "2026-11-25",
+      items: [
+        {
+          title: "Print from the iPad and iPhone app",
+          text: "From the home screen, an iPad or iPhone app can't open the print dialog, so the button did " +
+            "nothing. Now it makes a PDF of the printout and opens the share sheet: choose Print, Save to " +
+            "Files or Mail. In Safari and on a computer, Print works as before, and Save PDF makes the same PDF.",
+        },
+        {
+          title: "Chart readable on paper",
+          text: "The CG chart is drawn again at its printed size before printing, so its numbers aren't tiny " +
+            "when you print from an iPad or a computer.",
+        },
+      ],
+    },
+    {
       id: 15,
       date: "2026-11-24",
       items: [

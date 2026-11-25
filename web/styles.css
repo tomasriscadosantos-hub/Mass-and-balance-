@@ -583,6 +583,14 @@ dialog.sheet::backdrop {
 @keyframes scrim-in { from { opacity: 0; } }
 @keyframes item-in { from { transform: translateY(8px); opacity: 0; } }
 
+/* ------------------------------------------------------------ PDF sheet */
+.sheet-actions { display: flex; flex-direction: column; gap: 8px; padding: 8px 20px 20px; }
+.sheet-actions .btn-primary { margin: 0; }
+.sheet-actions .btn-ghost { justify-content: center; min-height: 44px; }
+.pdf-status { margin: 14px 0 10px; font-size: var(--step-0); }
+#pdf-progress { display: block; width: 100%; height: 8px; margin-bottom: 8px; accent-color: var(--accent); }
+#pdf-progress[hidden] { display: none; }
+
 /* --------------------------------------------------------------- print */
 /* Print (Print button, or the browser's own): the results on A4 in light
    colours, without the inputs, buttons, weather downloads and method notes.

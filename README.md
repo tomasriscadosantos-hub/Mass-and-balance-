@@ -60,6 +60,17 @@ with the open briefings, and lines for the pilot in command, signature and instr
 buttons, NOTAM link and method notes are left out. A local flight with an alternate is four pages. The print layout is the
 `@media print` block at the end of `styles.css`.
 
+**PDF, and printing from an iPhone or iPad home-screen app.** A web app opened from the home screen
+on iOS / iPadOS has no print dialog (`window.print()` does nothing), so there the button makes a PDF
+instead: the page is laid out with the same print styles, drawn page by page into images with
+[html2canvas](https://html2canvas.hertzen.com) 1.4.1 (MIT, `vendor/html2canvas.min.js`, loaded only
+when needed and kept offline), and put into an A4 PDF by `js/pdf.js` (one image per page, page numbers
+at the foot). Pages break between rows and boxes, never through one. When it's ready, a button opens
+the share sheet (Print, Save to Files, Mail); iOS only allows that straight after a tap, so it's a
+second tap. In a browser the summary has Print and Save PDF; Save PDF downloads the same file where
+there's no share sheet. Before printing or making the PDF, the CG chart is drawn again at its printed
+width (half the page), so its text isn't tiny when printing from a wide screen.
+
 The previous school's sheet (EASA class B factors: ×1.15 TODA, ×1.3 ASDA or ×1.25 TORA, 70 % of
 LDA) is still there as an option. The alternate leg is measured from the destination, using the
 aerodrome reference points in `js/data.js`. LPPM's position and elevation come from NAV Portugal's sunrise/sunset tables. LPFR and LPBJ coordinates

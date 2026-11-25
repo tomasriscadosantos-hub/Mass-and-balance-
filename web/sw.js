@@ -1,7 +1,7 @@
 // Offline support: keeps a copy of the app so it opens without signal at the
 // airfield. Bump VERSION whenever any file below changes: that is what tells
 // installed apps there is an update (the page then reloads itself once).
-const VERSION = "mb-lppm-24";
+const VERSION = "mb-lppm-25";
 const FILES = [
   "./",
   "index.html",
@@ -11,7 +11,9 @@ const FILES = [
   "js/poh.js",
   "js/calc.js",
   "js/changes.js",
+  "js/pdf.js",
   "js/app.js",
+  "vendor/html2canvas.min.js",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/apple-touch-icon.png",

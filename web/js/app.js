@@ -1041,8 +1041,19 @@
       figure("Minimum fuel", n(f.requiredGal, 1) + " gal", "on board " + n(f.requiredGal + f.extraGal, 1) +
         " · extra " + n(f.extraGal, 1)) +
       "</div>" +
-      '<div class="summary-actions"><button type="button" class="btn-ghost" data-print>Print</button>' +
-      '<span class="hint">Mass and balance, fuel and performance on A4, or save as PDF.</span></div>';
+      '<div class="summary-actions">' + (noPrintDialog()
+        ? '<button type="button" class="btn-ghost" data-pdf>Print or save PDF</button>' +
+          '<span class="hint">Makes a PDF of the mass and balance, weather and performance for the share ' +
+          "sheet: Print, Save to Files or Mail.</span>"
+        : '<button type="button" class="btn-ghost" data-print>Print</button>' +
+          '<button type="button" class="btn-ghost" data-pdf>Save PDF</button>' +
+          '<span class="hint">Mass and balance, weather and performance on A4.</span>') + "</div>";
+  }
+
+  // An app opened from the home screen of an iPhone or iPad has no print
+  // dialog: window.print() does nothing there. It makes a PDF instead.
+  function noPrintDialog() {
+    return window.navigator.standalone === true || window.__forcePdf === true;
   }
 
   // Printed only: what the sheet is for (aircraft, date, route, fuel, rules).
@@ -1098,8 +1109,265 @@
   function bindPrint() {
     $("summary").addEventListener("click", function (e) {
       if (e.target.closest("[data-print]")) window.print();
+      else if (e.target.closest("[data-pdf]")) makePdf();
     });
-    window.addEventListener("beforeprint", stampPrintTime);
+    // The chart is drawn for its width on screen; the printout has it half a
+    // page wide, so it is drawn again for that (else its text prints tiny).
+    window.addEventListener("beforeprint", function () {
+      stampPrintTime();
+      renderChart(last, PRINT_CHART_PX);
+    });
+    window.addEventListener("afterprint", function () {
+      renderChart(last);
+    });
+    $("pdf-close").addEventListener("click", closePdfSheet);
+    $("pdf-sheet").addEventListener("cancel", function (e) {
+      if (pdf.busy) e.preventDefault(); // Esc while it's drawing: let it finish
+    });
+    $("pdf-share").addEventListener("click", function () {
+      if (pdf.file) sharePdf(pdf.file);
+    });
+  }
+
+  // ------------------------------------------------------------------ PDF
+
+  // The printout as a PDF: the page is laid out with the print styles, drawn
+  // page by page into images (html2canvas, vendor/), and put in a PDF (pdf.js).
+  var pdf = { busy: false, file: null };
+  var PDF_WIDTH_PX = 703; // A4 width less 2 x 12 mm margins, at 96 px per inch
+  var PDF_PAGE_PX = Math.floor((PDF_WIDTH_PX * (297 - 12 - 14)) / (210 - 24)); // the height that fits a page
+  var PRINT_CHART_PX = Math.round(PDF_WIDTH_PX / 2); // .chart-box is 50 % wide in the print styles
+
+  function pdfStatus(text, progress) {
+    $("pdf-status").textContent = text;
+    var bar = $("pdf-progress");
+    bar.hidden = progress === undefined;
+    if (progress !== undefined) bar.value = progress;
+  }
+
+  function openPdfSheet() {
+    var dlg = $("pdf-sheet");
+    if (typeof dlg.showModal === "function") {
+      if (!dlg.open) dlg.showModal();
+    } else {
+      dlg.setAttribute("open", "");
+    }
+  }
+
+  function closePdfSheet() {
+    if (pdf.busy) return;
+    var dlg = $("pdf-sheet");
+    if (typeof dlg.close === "function" && dlg.open) dlg.close();
+    else dlg.removeAttribute("open");
+  }
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = function () {
+        reject(new Error("couldn't load " + src + " (open the app once with signal)"));
+      };
+      document.head.appendChild(s);
+    });
+  }
+
+  // The rules in the stylesheet's @media print block, to lay the page out as printed.
+  function printRules() {
+    var css = "";
+    Array.prototype.forEach.call(document.styleSheets, function (sheet) {
+      var rules;
+      try {
+        rules = sheet.cssRules;
+      } catch (e) {
+        return; // the Google Fonts sheet can't be read: not needed
+      }
+      Array.prototype.forEach.call(rules || [], function (rule) {
+        if (rule.media && /\bprint\b/.test(rule.media.mediaText)) {
+          Array.prototype.forEach.call(rule.cssRules, function (inner) {
+            if (!/^@page/.test(inner.cssText)) css += inner.cssText + "\n";
+          });
+        }
+      });
+    });
+    return css;
+  }
+
+  // Where to start each page: at gaps between rows, lines and boxes, never
+  // through one, and at the full page height when nothing fits.
+  function pageBreaks(box) {
+    var top0 = box.getBoundingClientRect().top;
+    var total = Math.ceil(box.getBoundingClientRect().height);
+    var spans = [];
+    box.querySelectorAll("tr, p, li, dt, dd, h2, .figures, .chart, .dep-brief, .wx-report, .panel-head, " +
+      ".aerodrome-head, .report-head, .print-head, .print-sign").forEach(function (el) {
+      var r = el.getBoundingClientRect();
+      if (r.height > 0) spans.push([r.top - top0, r.bottom - top0]);
+    });
+    var cuts = [];
+    spans.forEach(function (s) {
+      cuts.push(Math.floor(s[0]), Math.ceil(s[1]));
+    });
+    cuts.sort(function (a, b) {
+      return b - a;
+    });
+    function clear(y) {
+      return spans.every(function (s) {
+        return !(s[0] < y - 0.5 && s[1] > y + 0.5);
+      });
+    }
+    var pages = [];
+    var start = 0;
+    while (total - start > 2) {
+      var end = start + PDF_PAGE_PX;
+      if (end >= total) {
+        pages.push([start, total]);
+        break;
+      }
+      var cut = end;
+      for (var i = 0; i < cuts.length; i++) {
+        var y = cuts[i];
+        if (y <= end && y > start + PDF_PAGE_PX * 0.4 && clear(y)) {
+          cut = y;
+          break;
+        }
+      }
+      pages.push([start, cut]);
+      start = cut;
+    }
+    return pages;
+  }
+
+  // html2canvas draws an SVG as a separate image, without the stylesheet:
+  // copy the chart's styles onto its elements in the copy it draws.
+  var SVG_STYLES = ["fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-linejoin",
+    "opacity", "font-family", "font-size", "font-weight"];
+  function inlineSvgStyles(doc) {
+    var win = doc.defaultView;
+    doc.querySelectorAll(".chart-box svg, .chart-box svg *").forEach(function (el) {
+      var cs = win.getComputedStyle(el);
+      SVG_STYLES.forEach(function (k) {
+        var v = cs.getPropertyValue(k);
+        if (v) el.style.setProperty(k, v);
+      });
+    });
+  }
+
+  function drawPages(progress) {
+    var style = document.createElement("style");
+    style.textContent = printRules() +
+      ".col-results { width: " + PDF_WIDTH_PX + "px !important; background: #ffffff; }\n" +
+      // the print rules hide dialogs: keep this sheet (and an opaque backdrop) while drawing
+      "dialog#pdf-sheet[open] { display: block !important; }\n" +
+      "dialog.sheet::backdrop { background: #eef1f3; }\n";
+    var scroll = [window.scrollX, window.scrollY];
+    document.head.appendChild(style);
+    stampPrintTime();
+    renderChart(last, PRINT_CHART_PX);
+    window.scrollTo(0, 0);
+    var box = document.querySelector(".col-results");
+    var images = [];
+    var done = function () {
+      style.remove();
+      renderChart(last);
+      window.scrollTo(scroll[0], scroll[1]);
+    };
+    return (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve())
+      .then(function () {
+        return new Promise(function (r) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(r);
+          });
+        });
+      })
+      .then(function () {
+        var breaks = pageBreaks(box);
+        var chain = Promise.resolve();
+        breaks.forEach(function (b, i) {
+          chain = chain.then(function () {
+            progress(i, breaks.length);
+            return window.html2canvas(box, {
+              x: 0, y: b[0], width: PDF_WIDTH_PX, height: b[1] - b[0],
+              scale: 2, backgroundColor: "#ffffff", logging: false, onclone: inlineSvgStyles,
+            });
+          }).then(function (canvas) {
+            images.push({ jpeg: MB.pdf.dataUrlBytes(canvas.toDataURL("image/jpeg", 0.9)),
+              width: canvas.width, height: canvas.height });
+            canvas.width = canvas.height = 0; // free the memory now (iPad)
+          });
+        });
+        return chain;
+      })
+      .then(function () {
+        done();
+        return images;
+      }, function (err) {
+        done();
+        throw err;
+      });
+  }
+
+  function makePdf() {
+    if (pdf.busy) return;
+    var r = last;
+    if (!r || !r.mb) return;
+    pdf.busy = true;
+    pdf.file = null;
+    $("pdf-share").hidden = true;
+    $("pdf-close").disabled = true;
+    $("pdf-kicker").textContent = "Printout · " + state.reg;
+    pdfStatus("Making the PDF…", 0);
+    openPdfSheet();
+    var name = "LPPM-Flight-" + state.reg + "-" + r.date + ".pdf";
+    var title = "LPPM Flight · " + state.reg + " · " + longDate(r.date);
+    (window.html2canvas ? Promise.resolve() : loadScript("vendor/html2canvas.min.js"))
+      .then(function () {
+        return drawPages(function (i, n) {
+          pdfStatus("Making the PDF: page " + (i + 1) + " of " + n + "…", i / n);
+        });
+      })
+      .then(function (images) {
+        var bytes = MB.pdf.jpegPdf(images, {
+          title: title,
+          footer: function (k, n) {
+            return "LPPM Flight  " + state.reg + "  " + r.date + "   page " + k + " of " + n;
+          },
+        });
+        pdf.file = new File([bytes], name, { type: "application/pdf" });
+        pdfStatus("PDF ready: " + images.length + (images.length === 1 ? " page" : " pages") + ", " +
+          Math.max(1, Math.round(bytes.length / 1024)) + " KB. Choose Print, Save to Files or Mail.");
+        $("pdf-share").hidden = false;
+        $("pdf-share").focus();
+      })
+      .catch(function (err) {
+        pdfStatus("Couldn't make the PDF: " + (err && err.message ? err.message : err) + ".");
+      })
+      .then(function () {
+        pdf.busy = false;
+        $("pdf-close").disabled = false;
+      });
+  }
+
+  // The share sheet (Print, Save to Files, Mail) where there is one, else a download.
+  function sharePdf(file) {
+    if (navigator.canShare && navigator.share && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: file.name }).catch(function (err) {
+        if (err && err.name !== "AbortError") pdfStatus("Couldn't open the share sheet: " + err.message + ".");
+      });
+      return;
+    }
+    var url = URL.createObjectURL(file);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () {
+      URL.revokeObjectURL(url);
+    }, 60000);
+    pdfStatus("Saved as " + file.name + ".");
   }
   function figure(k, v, s) {
     return '<div class="figure"><div class="k">' + esc(k) + '</div><div class="v">' + v +
@@ -1189,14 +1457,15 @@
     return out;
   }
 
-  function renderChart(r) {
+  // widthPx: draw for that width (the printout) instead of the box on screen.
+  function renderChart(r, widthPx) {
     var box = $("chart");
     if (!r || !r.mb) {
       box.innerHTML = "";
       return;
     }
     var ac = r.ac;
-    var W = Math.max(280, Math.round(box.clientWidth || 600));
+    var W = Math.max(280, Math.round(widthPx || box.clientWidth || 600));
     var H = Math.round(Math.min(400, Math.max(250, W * 0.62)));
     var M = { l: 54, r: 14, t: 12, b: 42 };
     var bottom = ac.envelopeMinLb;
